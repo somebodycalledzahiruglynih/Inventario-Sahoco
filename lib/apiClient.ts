@@ -379,7 +379,9 @@ export async function sendStockUpdate(
       };
     }
 
-    const postUrl = typeof window !== 'undefined' ? '/api/inventory' : APPS_SCRIPT_ENDPOINT;
+    const postUrl = typeof window !== 'undefined'
+      ? '/api/inventory?action=update'
+      : `${APPS_SCRIPT_ENDPOINT}?action=update`;
     const res = await fetch(postUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -424,7 +426,9 @@ export async function sendBulkStockUpdate(
       timestamp: new Date().toISOString()
     };
 
-    const postUrl = typeof window !== 'undefined' ? '/api/inventory' : APPS_SCRIPT_ENDPOINT;
+    const postUrl = typeof window !== 'undefined'
+      ? '/api/inventory?action=bulk_update'
+      : `${APPS_SCRIPT_ENDPOINT}?action=bulk_update`;
     const res = await fetch(postUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -493,7 +497,9 @@ export async function sendSaveRecipe(
       timestamp: new Date().toISOString()
     };
 
-    const postUrl = typeof window !== 'undefined' ? '/api/inventory' : APPS_SCRIPT_ENDPOINT;
+    const postUrl = typeof window !== 'undefined'
+      ? '/api/inventory?action=save_recipe'
+      : `${APPS_SCRIPT_ENDPOINT}?action=save_recipe`;
     const res = await fetch(postUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -527,7 +533,9 @@ export async function sendDeleteRecipe(
       timestamp: new Date().toISOString()
     };
 
-    const postUrl = typeof window !== 'undefined' ? '/api/inventory' : APPS_SCRIPT_ENDPOINT;
+    const postUrl = typeof window !== 'undefined'
+      ? '/api/inventory?action=delete_recipe'
+      : `${APPS_SCRIPT_ENDPOINT}?action=delete_recipe`;
     const res = await fetch(postUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -560,7 +568,9 @@ export async function sendNewProduct(
       timestamp: new Date().toISOString()
     };
 
-    const postUrl = typeof window !== 'undefined' ? '/api/inventory' : APPS_SCRIPT_ENDPOINT;
+    const postUrl = typeof window !== 'undefined'
+      ? '/api/inventory?action=add'
+      : `${APPS_SCRIPT_ENDPOINT}?action=add`;
     const res = await fetch(postUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -595,7 +605,9 @@ export async function sendDeleteProduct(
       timestamp: new Date().toISOString()
     };
 
-    const postUrl = typeof window !== 'undefined' ? '/api/inventory' : APPS_SCRIPT_ENDPOINT;
+    const postUrl = typeof window !== 'undefined'
+      ? '/api/inventory?action=delete'
+      : `${APPS_SCRIPT_ENDPOINT}?action=delete`;
     const res = await fetch(postUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

@@ -45,10 +45,20 @@ export async function GET(req: Request) {
 }
 
 // POST /api/inventory
+// La acción viaja también en la query string (?action=...) porque el Apps Script
+// del cliente lee e.parameter.action y sin ella interpreta el POST como "get".
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const res = await fetch(APPS_SCRIPT_URL, {
+    const queryAction = new URL(req.url).searchParams.get('action') || '';
+    const bodyAction = body && typeof body.action === 'string' ? body.action : '';
+    const rawAction = queryAction || bodyAction;
+    const safeAction = /^[a-z_]{1,30}$/i.test(rawAction) ? rawAction : '';
+    const targetUrl = safeAction
+      ? `${APPS_SCRIPT_URL}?action=${encodeURIComponent(safeAction)}`
+      : APPS_SCRIPT_URL;
+
+    const res = await fetch(targetUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(body),
