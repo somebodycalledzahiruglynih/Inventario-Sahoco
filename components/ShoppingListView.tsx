@@ -10,7 +10,8 @@ import {
   FileText,
   PackagePlus,
   Search,
-  Sparkles
+  Sparkles,
+  Flame
 } from 'lucide-react';
 import { ProductItem, MainCategory } from '../lib/types';
 
@@ -41,6 +42,11 @@ export const ShoppingListView: React.FC<ShoppingListViewProps> = ({
   // Filter all items where stockActual <= stockMinimo
   const lowStockItems = useMemo(() => {
     return products.filter(p => p.stockActual <= p.stockMinimo);
+  }, [products]);
+
+  // Insumos críticos: marcados como prioridad alta Y por debajo del mínimo
+  const priorityCriticalItems = useMemo(() => {
+    return products.filter(p => p.esPrioritario && p.stockActual <= p.stockMinimo);
   }, [products]);
 
   // Count items needing restock per category for badges
@@ -137,6 +143,70 @@ export const ShoppingListView: React.FC<ShoppingListViewProps> = ({
   return (
     <div className="space-y-4">
       
+      {/* 0. SECCIÓN ESPECIAL: INSUMOS CRÍTICOS DE PRIORIDAD ALTA */}
+      {priorityCriticalItems.length > 0 && (
+        <div className="bg-gradient-to-r from-red-500/[0.12] via-orange-500/[0.07] to-[#1a1a1a] border border-red-500/30 rounded-3xl p-4 sm:p-5 shadow-[0_4px_25px_rgba(248,113,113,0.15)]">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2.5 rounded-2xl bg-red-500/15 border border-red-500/30 text-red-400 shadow-sm flex-none animate-pulse">
+              <Flame className="w-5 h-5" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                <span>🔥 Insumos Críticos de Prioridad Alta</span>
+                <span className="px-2 py-0.5 rounded-full text-xs font-black bg-red-500/20 text-red-400 border border-red-500/30">
+                  {priorityCriticalItems.length}
+                </span>
+              </h2>
+              <p className="text-[11px] text-slate-400 font-medium">
+                Insumos clave de la cocina que están por debajo de su mínimo
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {priorityCriticalItems.map(item => {
+              const isOutOfStock = item.stockActual <= 0;
+              return (
+                <div
+                  key={`priority-${item.id}`}
+                  className="flex items-center justify-between gap-3 bg-[#141414]/80 border border-red-500/20 rounded-2xl px-3 py-2.5"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <img
+                      src={item.foto}
+                      alt={item.nombre}
+                      className="w-9 h-9 rounded-xl object-cover bg-[#242424] flex-none border border-red-500/25"
+                    />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-xs text-white truncate block">
+                          {item.nombre}
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-red-500/20 text-red-400 border border-red-500/30 flex-none">
+                          🔥 ALTA
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-0.5">
+                        Stock: <strong className={isOutOfStock ? 'text-red-400' : 'text-white'}>{item.stockActual}</strong> {item.unidad} • Mín: {item.stockMinimo}
+                        {isOutOfStock && <span className="ml-1.5 text-red-400 font-extrabold">• AGOTADO</span>}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => onRequestRestock(item)}
+                    className="flex items-center gap-1.5 py-1.5 px-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold shadow-[0_0_12px_rgba(16,185,129,0.3)] active:scale-95 transition-all flex-none"
+                  >
+                    <PackagePlus className="w-3.5 h-3.5" />
+                    <span className="whitespace-nowrap">Reponer</span>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* 1. Header Banner */}
       <div className="bg-[#1a1a1a] border border-white/[0.08] shadow-[0_4px_20px_rgba(0,0,0,0.3)] rounded-3xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -348,6 +418,11 @@ export const ShoppingListView: React.FC<ShoppingListViewProps> = ({
                                 ) : (
                                   <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-amber-500/15 text-amber-400 border border-amber-500/25 flex-none">
                                     Bajo
+                                  </span>
+                                )}
+                                {item.esPrioritario && (
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-orange-500/15 text-orange-400 border border-orange-500/25 flex-none">
+                                    🔥 Clave
                                   </span>
                                 )}
                               </div>

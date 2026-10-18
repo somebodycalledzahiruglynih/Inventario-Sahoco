@@ -18,6 +18,9 @@ export interface ProductItem {
   cantidadSugerida: number;
   ultimaModificacion?: string;
   modificadoPor?: string;
+  // Prioridad de insumo clave de cocina (Configuración → Prioridad de Insumos)
+  esPrioritario?: boolean;
+  nivelPrioridad?: 'Alta' | 'Media' | 'Baja';
 }
 
 export type HistoryTipo =
@@ -107,5 +110,16 @@ export const AUTHORIZED_USERS = [
 ] as const;
 
 export type UserName = typeof AUTHORIZED_USERS[number]['name'];
+
+// Rol / puesto en cocina por usuario (menú de perfil del header)
+export const USER_ROLES: Record<UserName, string> = {
+  Zahir: 'Administrador General',
+  Alba: 'Chef de Cocina',
+  Elmy: 'Repostería & Postres',
+  Hugo: 'Cocina & Freidora',
+  Leo: 'Almacén & Compras',
+  Rosalia: 'Almacén & Compras',
+  SAHOCO: 'Cuenta Central del Negocio',
+};
 
 export const AUTH_PASSWORD = 's4hoco2026';

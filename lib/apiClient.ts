@@ -1,4 +1,5 @@
 import { ProductItem, HistoryRecord, UserName, ComisoPayload, Recipe } from './types';
+import { PendingStockChange } from './pendingChanges';
 import { normalizeRecipe } from './recipes';
 import { APPS_SCRIPT_ENDPOINT } from './appsScriptUrl';
 
@@ -349,6 +350,12 @@ export async function sendStockUpdate(
       timestamp: new Date().toISOString()
     };
 
+    // Insumo clave de cocina: la alerta viaja como MÁXIMA PRIORIDAD
+    if (item.esPrioritario) {
+      payload.esPrioritario = true;
+      payload.nivelPrioridad = item.nivelPrioridad || 'Alta';
+    }
+
     // Campos de ficha: solo se envían en la edición explícita (extraUpdates),
     // para que los +/- normales de stock no sobrescriban celdas de la hoja.
     if (extraUpdates) {
@@ -421,7 +428,8 @@ export async function sendBulkStockUpdate(
         id: c.product.id,
         nombre: c.product.nombre,
         actual: c.newStock,
-        sugerido: c.product.cantidadSugerida
+        sugerido: c.product.cantidadSugerida,
+        ...(c.product.esPrioritario ? { esPrioritario: true } : {})
       })),
       timestamp: new Date().toISOString()
     };
@@ -551,6 +559,119 @@ export async function sendDeleteRecipe(
   } catch (err: any) {
     return { success: true, message: `Eliminada localmente: ${err.message}` };
   }
+}
+
+/**
+ * Sincroniza un LOTE de cambios de stock acumulados (batching de jornada).
+ * Envía TODO el lote en un solo POST `bulk_update` con `notificar: true`,
+ * de modo que Apps Script envíe un único correo consolidado.
+ * Si el backend aún no soporta `bulk_update` u `notificar`, reintenta cada
+ * cambio de forma individual para no perder datos.
+ */
+export async function sendStockBatch(
+  changes: PendingStockChange[],
+  usuario: string
+): Promise<{ success: boolean; message: string; fallbackUsed: boolean }> {
+  if (!changes.length) {
+    return { success: true, message: 'Sin cambios pendientes', fallbackUsed: false };
+  }
+
+  try {
+    const payload = {
+      action: 'bulk_update',
+      usuario: usuario,
+      detalle: `Lote de cambios de jornada (${changes.length} ${changes.length === 1 ? 'insumo' : 'insumos'})`,
+      notificar: true,
+      changes: changes.map(c => ({
+        rowIndex: c.rowIndex,
+        id: c.id,
+        nombre: c.nombre,
+        actual: c.actual,
+        sugerido: c.sugerido,
+        stockAnterior: c.stockAnterior,
+        usuario: c.usuario || usuario,
+        ...(c.esPrioritario ? { esPrioritario: true, nivelPrioridad: c.nivelPrioridad || 'Alta' } : {})
+      })),
+      timestamp: new Date().toISOString()
+    };
+
+    const postUrl = typeof window !== 'undefined'
+      ? '/api/inventory?action=bulk_update'
+      : `${APPS_SCRIPT_ENDPOINT}?action=bulk_update`;
+    const res = await fetch(postUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const text = await res.text();
+    if (!text.includes('<!DOCTYPE')) {
+      try {
+        const json = JSON.parse(text);
+        if (json.status === 'success') {
+          return {
+            success: true,
+            message: json.message || `${changes.length} cambios sincronizados en un solo lote`,
+            fallbackUsed: false
+          };
+        }
+        // Backend antiguo sin `bulk_update`: reintentar individualmente
+        if (!/no v[aá]lida|inv[aá]lid|invalid/i.test(String(json.message || ''))) {
+          return { success: false, message: json.message || 'No se pudo sincronizar el lote', fallbackUsed: false };
+        }
+      } catch {
+        // Respuesta no JSON: se intenta el envío individual
+      }
+    }
+  } catch (err: any) {
+    return { success: false, message: `Sin conexión: ${err.message}`, fallbackUsed: false };
+  }
+
+  return sendStockBatchFallback(changes, usuario);
+}
+
+/**
+ * Plan B del lote: reenvía cada cambio acumulado como `update` individual.
+ * Se usa cuando el backend todavía no reconoce `bulk_update + notificar`.
+ */
+async function sendStockBatchFallback(
+  changes: PendingStockChange[],
+  usuario: string
+): Promise<{ success: boolean; message: string; fallbackUsed: boolean }> {
+  let ok = 0;
+  let lastMessage = '';
+
+  for (const c of changes) {
+    const item: ProductItem = {
+      id: c.id,
+      rowIndex: c.rowIndex,
+      nombre: c.nombre,
+      suplidor: '',
+      categoria: 'Insumos & Salado',
+      descripcion: '',
+      foto: '',
+      fechaVencimiento: '',
+      stockActual: c.stockAnterior,
+      unidad: '',
+      stockMinimo: 0,
+      stockMaximo: 0,
+      cantidadSugerida: c.sugerido,
+      esPrioritario: c.esPrioritario,
+      nivelPrioridad: c.nivelPrioridad
+    };
+    const res = await sendStockUpdate(item, c.actual, c.sugerido, c.usuario || usuario);
+    if (res.success) ok++;
+    else lastMessage = res.message;
+  }
+
+  const success = ok === changes.length;
+  return {
+    success,
+    message: success
+      ? `${ok} ${ok === 1 ? 'cambio sincronizado' : 'cambios sincronizados'}`
+      : `Sincronizados ${ok} de ${changes.length}${lastMessage ? ` — ${lastMessage}` : ''}`,
+    fallbackUsed: true
+  };
 }
 
 /**

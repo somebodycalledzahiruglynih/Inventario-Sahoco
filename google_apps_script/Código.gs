@@ -199,12 +199,18 @@ function sahocoNotificarCambio_(detalle) {
     if (!SAHOCO_EMAIL_NOTIFICACIONES || SAHOCO_EMAIL_NOTIFICACIONES.length === 0) {
       return;
     }
-    const asunto = "📦 SAHOCO | " + (detalle.tipo || "Movimiento") + ": " + (detalle.producto || "Insumo");
+    const esPrioritario = detalle.esPrioritario === true;
+    const asunto =
+      (esPrioritario ? "🚨 [MÁXIMA PRIORIDAD - INSUMO CLAVE] " : "") +
+      "📦 SAHOCO | " + (detalle.tipo || "Movimiento") + ": " + (detalle.producto || "Insumo");
     const cuerpo = [
+      esPrioritario ? "🚨 INSUMO CLAVE DE COCINA - MÁXIMA PRIORIDAD" : "",
+      esPrioritario ? "--------------------------------------" : "",
       "MOVIMIENTO REGISTRADO EN SAHOCO",
       "--------------------------------------",
       "Tipo: " + (detalle.tipo || ""),
       "Producto: " + (detalle.producto || ""),
+      esPrioritario ? "Prioridad: ALTA (insumo indispensable)" : "",
       (detalle.stockAnterior !== undefined && detalle.stockAnterior !== "" && detalle.stockAnterior !== null)
         ? "Stock anterior: " + detalle.stockAnterior : "",
       (detalle.stockNuevo !== undefined && detalle.stockNuevo !== "" && detalle.stockNuevo !== null)
@@ -287,6 +293,114 @@ function sahocoNotificarComiso_(detalle) {
     });
   } catch (e) {
     // Si el correo falla, el comiso ya quedó registrado: no romper la respuesta
+  }
+}
+
+/**
+ * Notificación por correo de un LOTE de cambios de stock (batching de la app).
+ * Se envía UN solo correo con todos los insumos modificados en la jornada.
+ * Si el módulo de correos HTML (Correos.gs) está instalado, usa su plantilla;
+ * de lo contrario envía texto plano. Se desactiva si SAHOCO_EMAIL_NOTIFICACIONES
+ * está vacío.
+ */
+function sahocoNotificarLote_(detalle) {
+  try {
+    if (!SAHOCO_EMAIL_NOTIFICACIONES || SAHOCO_EMAIL_NOTIFICACIONES.length === 0) {
+      return;
+    }
+    const d = detalle || {};
+    const cambios = Array.isArray(d.cambios) ? d.cambios : [];
+    if (cambios.length === 0) {
+      return;
+    }
+
+    const visibles = cambios.slice(0, 50);
+    const ocultos = cambios.length - visibles.length;
+    const hayPrioridad = cambios.some(function (c) { return c.esPrioritario === true; });
+    const asunto = (hayPrioridad ? "🚨 [MÁXIMA PRIORIDAD - INSUMO CLAVE] " : "") +
+      "📦 SAHOCO | " + cambios.length + " cambios de stock sincronizados (" + (d.usuario || "varios") + ")";
+
+    const lineasTexto = cambios.map(function (c) {
+      return (c.esPrioritario ? "🔥 " : "• ") + (c.nombre || "Insumo") + ": " + (c.anterior || 0) + " → " + (c.nuevo || 0) +
+        (c.usuario ? " (" + c.usuario + ")" : "");
+    });
+
+    // ¿Está instalado el módulo de correos HTML (Correos.gs)?
+    const hayPlantilla =
+      typeof sahocoCorreoPlantilla_ === "function" &&
+      typeof sahocoCorreoEnviar_ === "function" &&
+      typeof sahocoCorreoFila_ === "function" &&
+      typeof sahocoCorreoPildora_ === "function" &&
+      typeof sahocoCorreoNum_ === "function" &&
+      typeof sahocoCorreoEsc_ === "function";
+
+    if (hayPlantilla) {
+      const hayAgotado = cambios.some(function (c) { return Number(c.nuevo) <= 0; });
+      const filas = visibles.map(function (c) {
+        const agotado = Number(c.nuevo) <= 0;
+        const color = agotado ? "#f87171" : (c.esPrioritario ? "#f97316" : "#34d399");
+        const valor = (c.esPrioritario ? "🔥 " : "") + '<b style="color:' + color + ';">' +
+          sahocoCorreoEsc_(sahocoCorreoNum_(c.anterior || 0)) + " → " +
+          sahocoCorreoEsc_(sahocoCorreoNum_(c.nuevo || 0)) + "</b>";
+        return sahocoCorreoFila_(c.nombre || "Insumo", "", { html: valor });
+      }).join("");
+
+      const nombresClaveArr = cambios
+        .filter(function (c) { return c.esPrioritario === true; })
+        .map(function (c) { return c.nombre || "Insumo"; });
+      const nombresClave = nombresClaveArr.slice(0, 8).join(", ") +
+        (nombresClaveArr.length > 8 ? " y " + (nombresClaveArr.length - 8) + " más" : "");
+      const nota = (hayPrioridad && typeof sahocoCorreoNota_ === "function")
+        ? sahocoCorreoNota_("Insumos clave afectados", nombresClave, "#f87171")
+        : "";
+
+      const html = sahocoCorreoPlantilla_({
+        acento: hayAgotado ? "#f87171" : "#f97316",
+        pildora: sahocoCorreoPildora_("Lote de " + cambios.length, "#f97316") +
+          (hayPrioridad ? " " + sahocoCorreoPildora_("🔥 Prioridad Alta", "#f87171") : ""),
+        resumen: (hayPrioridad ? "INSUMOS CLAVE. " : "") + cambios.length + " insumos actualizados de una sola vez",
+        titulo: hayPrioridad ? "Cambios de stock (con insumos clave)" : "Cambios de stock sincronizados",
+        subtitulo: d.detalle || ("Registrados por " + (d.usuario || "varios usuarios")),
+        filas: filas + (ocultos > 0
+          ? sahocoCorreoFila_("Y " + ocultos + " insumo(s) más", "…")
+          : ""),
+        nota: nota
+      });
+
+      const texto = [
+        "SAHOCO · INVENTARIO",
+        "--------------------------------------",
+        "LOTE DE CAMBIOS DE STOCK (" + cambios.length + ")",
+        ""
+      ].concat(lineasTexto).concat([
+        "",
+        "Detalle: " + (d.detalle || "Lote de jornada"),
+        "Enviado por: " + (d.usuario || "Usuario Sahoco"),
+        "Fecha: " + new Date().toLocaleString("es-DO")
+      ]).join("\n");
+
+      sahocoCorreoEnviar_(asunto, html, texto);
+      return;
+    }
+
+    // Respaldo en texto plano (sin Correos.gs instalado)
+    const cuerpo = [
+      "SAHOCO | LOTE DE CAMBIOS DE STOCK (" + cambios.length + ")",
+      "--------------------------------------"
+    ].concat(lineasTexto).concat([
+      "",
+      "Detalle: " + (d.detalle || "Lote de jornada"),
+      "Enviado por: " + (d.usuario || "Usuario Sahoco"),
+      "Fecha: " + new Date().toLocaleString("es-DO")
+    ]).join("\n");
+
+    MailApp.sendEmail({
+      to: SAHOCO_EMAIL_NOTIFICACIONES.join(","),
+      subject: asunto,
+      body: cuerpo
+    });
+  } catch (e) {
+    // Un fallo de correo nunca debe romper la operación principal
   }
 }
 
@@ -525,7 +639,8 @@ function handleRequest(e) {
             notas: c.notas || "",
             usuario: usuario,
             stockAnterior: c.stockAnterior !== undefined ? Number(c.stockAnterior) : "",
-            stockNuevo: c.stockNuevo !== undefined ? Number(c.stockNuevo) : newActual
+            stockNuevo: c.stockNuevo !== undefined ? Number(c.stockNuevo) : newActual,
+            esPrioritario: postData.esPrioritario === true
           };
           logAudit(ss, "COMISO", `Comiso/Merma de "${nombre}": -${detalleComiso.cantidad} ${detalleComiso.unidad} | Motivo: ${detalleComiso.motivo} | Venció: ${detalleComiso.fechaVencimiento || "N/A"} | Notas: ${detalleComiso.notas || "Sin observaciones"}`, usuario);
           sahocoRegistrarComiso_(ss, detalleComiso);
@@ -545,7 +660,9 @@ function handleRequest(e) {
           stockAnterior: stockAnterior,
           stockNuevo: newActual,
           sugerido: newSugerido,
-          usuario: usuario
+          usuario: usuario,
+          esPrioritario: postData.esPrioritario === true,
+          nivelPrioridad: postData.nivelPrioridad || ""
         });
       }
 
@@ -567,6 +684,7 @@ function handleRequest(e) {
       const lastCol = Math.max(sheet.getLastColumn(), 14);
       const cols = detectColumnMap(sheet, lastCol);
       const results = [];
+      const cambiosAplicados = [];
       let applied = 0;
       const lastRow = sheet.getLastRow();
 
@@ -579,6 +697,7 @@ function handleRequest(e) {
             results.push({ rowIndex: rowIndex, nombre: change.nombre || "", status: "skipped" });
             continue;
           }
+          const stockAnteriorFila = sheet.getRange(rowIndex, cols.actual + 1).getValue();
           sheet.getRange(rowIndex, cols.actual + 1).setValue(newActual);
           if (change.sugerido !== undefined && !isNaN(Number(change.sugerido))) {
             sheet.getRange(rowIndex, cols.sugerido + 1).setValue(Number(change.sugerido));
@@ -587,9 +706,16 @@ function handleRequest(e) {
             sheet.getRange(rowIndex, 13).setValue(new Date().toISOString());
           }
           if (sheet.getLastColumn() >= 14) {
-            sheet.getRange(rowIndex, 14).setValue(usuario);
+            sheet.getRange(rowIndex, 14).setValue(change.usuario || usuario);
           }
           applied++;
+          cambiosAplicados.push({
+            nombre: change.nombre || "Insumo",
+            anterior: stockAnteriorFila,
+            nuevo: newActual,
+            usuario: change.usuario || usuario,
+            esPrioritario: change.esPrioritario === true
+          });
           results.push({ rowIndex: rowIndex, nombre: change.nombre || "", status: "success" });
         } catch (rowErr) {
           results.push({ rowIndex: change.rowIndex, nombre: change.nombre || "", status: "error", message: String(rowErr) });
@@ -597,6 +723,14 @@ function handleRequest(e) {
       }
 
       logAudit(ss, "PREPARACION", `${detalle} | ${applied} de ${postData.changes.length} insumos descontados`, usuario);
+
+      if (postData.notificar === true && cambiosAplicados.length > 0) {
+        sahocoNotificarLote_({
+          usuario: usuario,
+          detalle: detalle,
+          cambios: cambiosAplicados
+        });
+      }
 
       return createJsonResponse({
         status: applied > 0 ? "success" : "error",

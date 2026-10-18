@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Filter, AlertTriangle, Plus, BarChart3, Package, ShoppingCart, Clock } from 'lucide-react';
 import confetti from 'canvas-confetti';
@@ -15,6 +15,7 @@ import {
   saveLocalHistory,
   fetchRemoteProducts, 
   sendStockUpdate, 
+  sendStockBatch,
   sendNewProduct,
   sendDeleteProduct,
   sendBulkStockUpdate,
@@ -23,6 +24,22 @@ import {
   sendDeleteRecipe
 } from '../lib/apiClient';
 import { getLocalRecipes, saveLocalRecipes, createRecipeId } from '../lib/recipes';
+import {
+  PendingStockChange,
+  getBatchWindowMs,
+  loadPendingChanges,
+  savePendingChanges,
+  queuePendingChange,
+  removePendingForProduct,
+  applyPendingToProducts
+} from '../lib/pendingChanges';
+import {
+  PriorityEntry,
+  loadPriorities,
+  savePriorities,
+  toggleProductPriority,
+  applyPriorityToProducts
+} from '../lib/priority';
 
 import { LoginScreen } from '../components/LoginScreen';
 import { TopHeader } from '../components/TopHeader';
@@ -38,6 +55,8 @@ import { ProductInfoModal } from '../components/ProductInfoModal';
 import { RecipesView } from '../components/RecipesView';
 import { RecipeFormModal, RecipeFormData } from '../components/RecipeFormModal';
 import { PrepareDishModal, DishDeduction } from '../components/PrepareDishModal';
+import { ProfileModal } from '../components/ProfileModal';
+import { SettingsModal } from '../components/SettingsModal';
 
 const CATEGORIES: { id: MainCategory | 'Todos'; label: string; icon: string }[] = [
   { id: 'Todos', label: 'Todos', icon: '✨' },
@@ -47,16 +66,36 @@ const CATEGORIES: { id: MainCategory | 'Todos'; label: string; icon: string }[] 
   { id: 'Desechables', label: 'Desechables & Empaques', icon: '📦' },
 ];
 
+// Clave de identidad de un cambio pendiente: sirve para quitar de la cola
+// solo lo que ya se sincronizó, sin borrar cambios nuevos de la misma sesión.
+const pendingChangeKey = (c: PendingStockChange) =>
+  `${c.id}|${c.rowIndex}|${c.lastAt}|${c.actual}|${c.sugerido}`;
+
 export default function MobileSahocoApp() {
   const [currentUser, setUser] = useState<UserName | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
 
   // Data states
-  const [products, setProducts] = useState<ProductItem[]>([]);
+  const [rawProducts, setProducts] = useState<ProductItem[]>([]);
+  // Prioridad de insumos clave (Configuración → Prioridad de Insumos).
+  // Se superpone sobre los productos para que toda la UI vea los flags.
+  const [priorities, setPriorities] = useState<PriorityEntry[]>([]);
+  const products = useMemo(
+    () => applyPriorityToProducts(rawProducts, priorities),
+    [rawProducts, priorities]
+  );
   const [history, setHistory] = useState<HistoryRecord[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+
+  // Batching: cola de cambios de stock pendientes de enviar en un solo lote
+  const [pendingChanges, setPendingChanges] = useState<PendingStockChange[]>([]);
+  const [batchNotice, setBatchNotice] = useState<string | null>(null);
+  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isFlushingRef = useRef(false);
+  const flushRef = useRef<(auto?: boolean) => Promise<void>>(async () => {});
 
   // Navigation & Filter states
   const [currentTab, setCurrentTab] = useState<ActiveTab>('inventory');
@@ -66,6 +105,10 @@ export default function MobileSahocoApp() {
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<ProductItem | null>(null);
+
+  // Menú de usuario: Perfil + Ajustes del Sistema
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // Comiso / Merma module
   const [comisoItem, setComisoItem] = useState<ProductItem | null>(null);
@@ -92,7 +135,15 @@ export default function MobileSahocoApp() {
     setProducts(getLocalProducts());
     setHistory(getLocalHistory());
     setRecipes(getLocalRecipes());
+    setPriorities(loadPriorities());
     setIsInitializing(false);
+
+    // Cola de batching de la jornada anterior: enviar al arrancar la app
+    const pending = loadPendingChanges();
+    setPendingChanges(pending);
+    if (pending.length > 0) {
+      flushTimerRef.current = setTimeout(() => flushRef.current(true), 8000);
+    }
 
     // Initial background sync
     if (savedUser) {
@@ -118,9 +169,15 @@ export default function MobileSahocoApp() {
   const handleSync = async () => {
     setIsSyncing(true);
     try {
+      // Antes de traer datos frescos: enviar el lote pendiente para no pisarlo
+      if (loadPendingChanges().length > 0) {
+        await flushRef.current(true);
+      }
       const result = await fetchRemoteProducts();
       if (result.items.length > 0) {
-        setProducts(result.items);
+        const stillPending = loadPendingChanges();
+        setProducts(stillPending.length > 0 ? applyPendingToProducts(result.items, stillPending) : result.items);
+        if (stillPending.length > 0) setPendingChanges(stillPending);
       }
       if (result.source === 'remote') {
         setSyncError(null);
@@ -202,6 +259,92 @@ export default function MobileSahocoApp() {
     });
   };
 
+  // ── BATCHING: acumulación y envío agrupado de cambios de stock ──
+  // Cada +/- de stock entra en la cola y se sincroniza en un lote único
+  // cuando pasa la ventana sin nuevos cambios o al pulsar "Sincronizar".
+  const updateQueue = (mutate: (queue: PendingStockChange[]) => PendingStockChange[]) => {
+    setPendingChanges(prev => {
+      const next = mutate(prev);
+      savePendingChanges(next);
+      return next;
+    });
+  };
+
+  const showBatchNotice = (message: string) => {
+    setBatchNotice(message);
+    if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+    noticeTimerRef.current = setTimeout(() => setBatchNotice(null), 5000);
+  };
+
+  const scheduleBatchFlush = () => {
+    if (flushTimerRef.current) clearTimeout(flushTimerRef.current);
+    flushTimerRef.current = setTimeout(() => flushRef.current(true), getBatchWindowMs());
+  };
+
+  const flushPendingChanges = async (auto: boolean = false) => {
+    if (isFlushingRef.current) return;
+    const queue = loadPendingChanges();
+    if (queue.length === 0) return;
+
+    isFlushingRef.current = true;
+    if (flushTimerRef.current) {
+      clearTimeout(flushTimerRef.current);
+      flushTimerRef.current = null;
+    }
+
+    try {
+      const result = await sendStockBatch(queue, currentUser || 'SAHOCO');
+      if (result.success) {
+        const flushed = new Set(queue.map(pendingChangeKey));
+        updateQueue(prev => prev.filter(c => !flushed.has(pendingChangeKey(c))));
+        setSyncError(null);
+        showBatchNotice(`✓ ${result.message}`);
+      } else {
+        setSyncError(result.message || 'No se pudo sincronizar el lote de cambios pendientes');
+        if (!auto) showBatchNotice('No se pudo sincronizar; se reintentará automáticamente');
+        scheduleBatchFlush();
+      }
+    } finally {
+      isFlushingRef.current = false;
+    }
+  };
+
+  const enqueueStockChange = (product: ProductItem, newActual: number, newSugerido: number) => {
+    const change: PendingStockChange = {
+      rowIndex: product.rowIndex,
+      id: product.id,
+      nombre: product.nombre,
+      actual: newActual,
+      sugerido: newSugerido,
+      stockAnterior: product.stockActual,
+      usuario: currentUser || 'SAHOCO',
+      lastAt: new Date().toISOString(),
+      esPrioritario: product.esPrioritario === true,
+      nivelPrioridad: product.nivelPrioridad
+    };
+    updateQueue(prev => queuePendingChange(prev, change));
+    scheduleBatchFlush();
+  };
+
+  // ── PRIORIDAD DE INSUMOS: marcar/desmarcar insumo clave de cocina ──
+  const handleTogglePriority = (product: ProductItem) => {
+    setPriorities(prev => {
+      const next = toggleProductPriority(prev, product, currentUser || 'SAHOCO');
+      savePriorities(next);
+      return next;
+    });
+  };
+
+  // Mantiene la referencia de flush al día y limpia temporizadores al desmontar
+  useEffect(() => {
+    flushRef.current = flushPendingChanges;
+  });
+
+  useEffect(() => () => {
+    if (flushTimerRef.current) clearTimeout(flushTimerRef.current);
+    if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+  }, []);
+
   // Stock Delta Adjustment [ - ] and [ + ] (Operational consumption / addition)
   const handleUpdateStockDelta = async (product: ProductItem, delta: number) => {
     const prevStock = product.stockActual;
@@ -224,11 +367,17 @@ export default function MobileSahocoApp() {
       newStock
     );
 
-    // Send POST to Google Apps Script with user identity
-    try {
-      await sendStockUpdate(product, newStock, product.cantidadSugerida, currentUser || 'SAHOCO');
-    } catch (err) {
-      console.warn('Stock update notice:', err);
+    if (newStock <= 0) {
+      // Alerta crítica: producto agotado → se sincroniza de inmediato
+      try {
+        await sendStockUpdate(product, newStock, product.cantidadSugerida, currentUser || 'SAHOCO');
+      } catch (err) {
+        console.warn('Stock update notice:', err);
+      }
+      updateQueue(prev => removePendingForProduct(prev, product));
+    } else {
+      // Batching: se acumula para el lote de la jornada
+      enqueueStockChange(product, newStock, product.cantidadSugerida);
     }
   };
 
@@ -244,11 +393,7 @@ export default function MobileSahocoApp() {
       `Ajustó cantidad sugerida de compra a ${newSugerido} ${product.unidad}`
     );
 
-    try {
-      await sendStockUpdate(product, product.stockActual, newSugerido, currentUser || 'SAHOCO');
-    } catch (err) {
-      console.warn('Sugerido update notice:', err);
-    }
+    enqueueStockChange(product, product.stockActual, newSugerido);
   };
 
   // Update Photo
@@ -288,7 +433,7 @@ export default function MobileSahocoApp() {
       colors: ['#D97706', '#5C3D2E', '#F59E0B', '#10b981']
     });
 
-    sendStockUpdate(product, newStock, product.cantidadSugerida, currentUser || 'SAHOCO');
+    enqueueStockChange(product, newStock, product.cantidadSugerida);
   };
 
   // Add New Product
@@ -335,6 +480,9 @@ export default function MobileSahocoApp() {
     } catch (e) {
       console.warn('Delete notice:', e);
     }
+
+    // Un insumo eliminado no debe quedar pendiente en el lote
+    updateQueue(prev => removePendingForProduct(prev, product));
   };
 
   // ── MÓDULO 1: COMISO / MERMA ──
@@ -386,6 +534,9 @@ export default function MobileSahocoApp() {
     } catch (err) {
       console.warn('Comiso sync notice:', err);
     }
+
+    // El comiso ya viajó al instante: no debe repetirse dentro del lote
+    updateQueue(prev => removePendingForProduct(prev, current));
   };
 
   // ── MÓDULO 3: FICHA + EDICIÓN RÁPIDA DE INSUMO ──
@@ -435,6 +586,9 @@ export default function MobileSahocoApp() {
     } catch (err) {
       console.warn('Info update sync notice:', err);
     }
+
+    // La ficha ya se sincronizó completa: quitar pendientes del lote para no repetir
+    updateQueue(prev => removePendingForProduct(prev, finalProduct));
   };
 
   // ── MÓDULO 2: RECETAS ──
@@ -559,6 +713,9 @@ export default function MobileSahocoApp() {
     } catch (err) {
       console.warn('Dish prep sync notice:', err);
     }
+
+    // Los insumos del plato ya bajaron en el lote de preparación: quitar pendientes
+    updateQueue(prev => auditEntries.reduce((queue, e) => removePendingForProduct(queue, e.product), prev));
   };
 
   // Filtered products for Inventory View
@@ -609,6 +766,8 @@ export default function MobileSahocoApp() {
       <TopHeader
         currentUser={currentUser}
         onLogout={handleLogout}
+        onOpenProfile={() => setIsProfileOpen(true)}
+        onOpenSettings={() => setIsSettingsOpen(true)}
         isSyncing={isSyncing}
         onRefresh={handleSync}
         activeCount={products.length}
@@ -819,6 +978,47 @@ export default function MobileSahocoApp() {
         shoppingAlertCount={shoppingAlertCount}
       />
 
+      {/* Batching: aviso de lote sincronizado */}
+      <AnimatePresence>
+        {batchNotice && (
+          <motion.div
+            initial={{ opacity: 0, y: -12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            className="fixed top-20 left-0 right-0 z-50 px-4 pointer-events-none"
+          >
+            <div className="max-w-xl mx-auto bg-[#1a1a1a] border border-emerald-500/30 text-emerald-300 text-xs font-bold rounded-2xl px-4 py-3 shadow-lg text-center">
+              {batchNotice}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Batching: cambios pendientes de sincronizar (lote de jornada) */}
+      {pendingChanges.length > 0 && (
+        <div className="fixed bottom-24 left-0 right-0 z-40 px-4">
+          <div className="max-w-xl mx-auto bg-[#1a1a1a] border border-orange-500/30 rounded-2xl px-4 py-3 shadow-[0_8px_30px_rgba(0,0,0,0.6)] flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-orange-500/15 border border-orange-500/25 text-orange-400 flex-none">
+              <Clock className="w-4 h-4" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-slate-100">
+                {pendingChanges.length} {pendingChanges.length === 1 ? 'cambio pendiente' : 'cambios pendientes'}
+              </p>
+              <p className="text-[10px] text-slate-400 mt-0.5">
+                Se envía un solo correo al pasar {Math.round(getBatchWindowMs() / 60000)} min sin cambios
+              </p>
+            </div>
+            <button
+              onClick={() => flushPendingChanges(false)}
+              className="px-3 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-[11px] font-bold shadow-[0_0_15px_rgba(249,115,22,0.35)] active:scale-95 transition-all flex-none"
+            >
+              Sincronizar ahora
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 4. Add Product Modal */}
       <AddProductModal
         isOpen={isAddModalOpen}
@@ -873,6 +1073,26 @@ export default function MobileSahocoApp() {
         products={products}
         onClose={() => setRecipeToPrepare(null)}
         onConfirm={handleConfirmPreparation}
+      />
+
+      {/* 10. Perfil del Usuario (menú del header) */}
+      <ProfileModal
+        isOpen={isProfileOpen}
+        currentUser={currentUser}
+        onClose={() => setIsProfileOpen(false)}
+        onChangeUser={() => {
+          setIsProfileOpen(false);
+          handleLogout();
+        }}
+      />
+
+      {/* 11. Ajustes del Sistema: pestaña Prioridad de Insumos */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        products={products}
+        currentUser={currentUser}
+        onTogglePriority={handleTogglePriority}
       />
 
     </div>
