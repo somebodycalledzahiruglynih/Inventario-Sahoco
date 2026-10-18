@@ -11,7 +11,9 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  Trash2
+  Trash2,
+  Info,
+  ShieldAlert
 } from 'lucide-react';
 import { ProductItem } from '../lib/types';
 import { checkExpiration, fileToBase64 } from '../lib/apiClient';
@@ -22,6 +24,8 @@ interface ProductCardProps {
   onUpdateSugerido: (product: ProductItem, newSugerido: number) => void;
   onUpdatePhoto: (product: ProductItem, newPhotoBase64: string) => void;
   onRequestDelete: (product: ProductItem) => void;
+  onRequestComiso: (product: ProductItem) => void;
+  onRequestInfo: (product: ProductItem) => void;
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({
@@ -29,7 +33,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onUpdateStockDelta,
   onUpdateSugerido,
   onUpdatePhoto,
-  onRequestDelete
+  onRequestDelete,
+  onRequestComiso,
+  onRequestInfo
 }) => {
   const [sugeridoInput, setSugeridoInput] = useState<string>(product.cantidadSugerida?.toString() || '0');
   const [isEditingSugerido, setIsEditingSugerido] = useState(false);
@@ -127,14 +133,25 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               </span>
             </div>
 
-            <button
-              type="button"
-              onClick={() => onRequestDelete(product)}
-              className="p-1.5 -mr-1 rounded-xl text-slate-600 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-              title="Eliminar insumo"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-0.5 flex-none">
+              <button
+                type="button"
+                onClick={() => onRequestInfo(product)}
+                className="p-1.5 rounded-xl text-slate-500 hover:text-sky-400 hover:bg-sky-500/10 transition-colors"
+                title="Ver información completa del insumo"
+              >
+                <Info className="w-4 h-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onRequestDelete(product)}
+                className="p-1.5 -mr-1 rounded-xl text-slate-600 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                title="Eliminar insumo"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
           {/* Product Name */}
@@ -231,6 +248,21 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Comiso / Merma action */}
+      <button
+        type="button"
+        onClick={() => onRequestComiso(product)}
+        disabled={product.stockActual <= 0}
+        className="mt-3 w-full py-3 px-4 rounded-2xl bg-red-500/10 hover:bg-red-500/15 disabled:opacity-35 disabled:cursor-not-allowed text-red-400 border border-red-500/25 hover:border-red-500/45 text-xs font-bold active:scale-[0.99] transition-all btn-thumb flex items-center justify-center gap-2"
+        title="Registrar pérdida, vencimiento o daño de este insumo"
+      >
+        <ShieldAlert className="w-4 h-4 flex-none" />
+        <span>Comiso / Merma</span>
+        <span className="text-[10px] font-semibold text-red-400/70 hidden sm:inline">
+          Pérdida o vencimiento
+        </span>
+      </button>
     </div>
   );
 };

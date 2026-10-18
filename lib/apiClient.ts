@@ -1,6 +1,8 @@
-import { ProductItem, HistoryRecord, UserName } from './types';
+import { ProductItem, HistoryRecord, UserName, ComisoPayload, Recipe } from './types';
+import { normalizeRecipe } from './recipes';
+import { APPS_SCRIPT_ENDPOINT } from './appsScriptUrl';
 
-export const APPS_SCRIPT_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxC6VFpj8pijG8DoNd6F-L3bPVoa0PX-43qxqdzCfQBwe5xJJl1xkEeAoECA64Cg5Ey/exec';
+export { APPS_SCRIPT_ENDPOINT };
 
 const STORAGE_KEY_PRODUCTS = 'sahoco_live_products_v9';
 const STORAGE_KEY_HISTORY = 'sahoco_live_history_v9';
@@ -241,17 +243,20 @@ export async function fetchRemoteProducts(): Promise<ProductItem[]> {
 }
 
 /**
- * Modificar Stock / Sugerido mediante petición POST en tiempo real
+ * Modificar Stock / Sugerido mediante petición POST en tiempo real.
+ * `extraUpdates` permite sincronizar campos adicionales (nombre, suplidor, mínimos, etc.)
+ * y `comiso` adjunta los detalles de una merma para auditoría + correo en Apps Script.
  */
 export async function sendStockUpdate(
   item: ProductItem,
   newActual: number,
   newSugerido: number,
   usuario: string,
-  extraUpdates?: Partial<ProductItem>
+  extraUpdates?: Partial<ProductItem>,
+  comiso?: ComisoPayload
 ): Promise<{ success: boolean; message: string }> {
   try {
-    const payload = {
+    const payload: Record<string, unknown> = {
       action: 'update',
       rowIndex: item.rowIndex,
       actual: newActual,
@@ -259,12 +264,38 @@ export async function sendStockUpdate(
       usuario: usuario,
       nombre: item.nombre,
       id: item.id,
-      fechaVencimiento: extraUpdates?.fechaVencimiento || item.fechaVencimiento,
-      descripcion: extraUpdates?.descripcion || item.descripcion,
-      unidad: extraUpdates?.unidad || item.unidad,
-      foto: extraUpdates?.foto || item.foto,
       timestamp: new Date().toISOString()
     };
+
+    // Campos de ficha: solo se envían en la edición explícita (extraUpdates),
+    // para que los +/- normales de stock no sobrescriban celdas de la hoja.
+    if (extraUpdates) {
+      const fichaFields: Array<keyof ProductItem> = [
+        'nombre', 'suplidor', 'categoria', 'unidad',
+        'stockMinimo', 'stockMaximo', 'descripcion',
+        'fechaVencimiento', 'foto', 'rowIndex'
+      ];
+      fichaFields.forEach((field) => {
+        if (extraUpdates[field] !== undefined && extraUpdates[field] !== null) {
+          payload[field] = extraUpdates[field];
+        }
+      });
+      if (typeof extraUpdates.nombre === 'string' && extraUpdates.nombre !== item.nombre) {
+        payload.nombreAnterior = item.nombre;
+      }
+    }
+
+    if (comiso) {
+      payload.comiso = {
+        cantidad: comiso.cantidad,
+        motivo: comiso.motivo,
+        fechaVencimiento: comiso.fechaVencimiento || '',
+        notas: comiso.notas || '',
+        stockAnterior: item.stockActual,
+        stockNuevo: newActual,
+        unidad: item.unidad
+      };
+    }
 
     const postUrl = typeof window !== 'undefined' ? '/api/inventory' : APPS_SCRIPT_ENDPOINT;
     const res = await fetch(postUrl, {
@@ -281,6 +312,154 @@ export async function sendStockUpdate(
     return { success: json.status === 'success', message: json.message || 'Sincronizado con Google Sheets' };
   } catch (err: any) {
     return { success: true, message: `Guardado en dispositivo: ${err.message}` };
+  }
+}
+
+/**
+ * Descarga quirúrgica en lote (preparación de platos).
+ * Cada insumo se procesa de forma aislada en el backend: si uno falla,
+ * los demás descuentos se mantienen íntegros.
+ */
+export async function sendBulkStockUpdate(
+  changes: Array<{ product: ProductItem; newStock: number }>,
+  usuario: string,
+  detalle: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    if (!changes.length) return { success: true, message: 'Sin cambios que sincronizar' };
+
+    const payload = {
+      action: 'bulk_update',
+      usuario: usuario,
+      detalle: detalle,
+      changes: changes.map(c => ({
+        rowIndex: c.product.rowIndex,
+        id: c.product.id,
+        nombre: c.product.nombre,
+        actual: c.newStock,
+        sugerido: c.product.cantidadSugerida
+      })),
+      timestamp: new Date().toISOString()
+    };
+
+    const postUrl = typeof window !== 'undefined' ? '/api/inventory' : APPS_SCRIPT_ENDPOINT;
+    const res = await fetch(postUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const text = await res.text();
+    if (text.includes('<!DOCTYPE')) {
+      return { success: true, message: 'Descuentos guardados en dispositivo' };
+    }
+    const json = JSON.parse(text);
+    return { success: json.status === 'success', message: json.message || `${changes.length} insumos sincronizados` };
+  } catch (err: any) {
+    return { success: true, message: `Guardado en dispositivo: ${err.message}` };
+  }
+}
+
+/**
+ * Carga las recetas guardadas en Google Sheets (pestaña "Recetas").
+ * Si falla, el llamador usa la caché local.
+ */
+export async function fetchRemoteRecipes(): Promise<Recipe[]> {
+  const urlsToTry: string[] = [];
+  if (typeof window !== 'undefined') {
+    urlsToTry.push('/api/inventory?action=get_recipes');
+  }
+  urlsToTry.push(`${APPS_SCRIPT_ENDPOINT}?action=get_recipes`);
+
+  let lastError: Error | null = null;
+  for (const url of urlsToTry) {
+    try {
+      const response = await fetch(url, { method: 'GET', headers: { Accept: 'application/json' } });
+      if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
+
+      const text = await response.text();
+      if (text.includes('<!DOCTYPE') || text.includes('<html')) {
+        throw new Error('Apps Script devolvió HTML en lugar de JSON');
+      }
+
+      const json = JSON.parse(text);
+      const rawData = Array.isArray(json) ? json : (json.data || json.recipes || []);
+      if (!Array.isArray(rawData)) throw new Error('Formato de recetas no reconocido');
+
+      return rawData
+        .map((r: any) => normalizeRecipe(r))
+        .filter((r: Recipe | null): r is Recipe => r !== null);
+    } catch (err: any) {
+      lastError = err;
+    }
+  }
+  throw lastError || new Error('No se pudieron cargar las recetas remotas');
+}
+
+/**
+ * Guarda (crea o actualiza) una receta en Google Sheets.
+ */
+export async function sendSaveRecipe(
+  recipe: Recipe,
+  usuario: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const payload = {
+      action: 'save_recipe',
+      recipe: recipe,
+      usuario: usuario,
+      timestamp: new Date().toISOString()
+    };
+
+    const postUrl = typeof window !== 'undefined' ? '/api/inventory' : APPS_SCRIPT_ENDPOINT;
+    const res = await fetch(postUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const text = await res.text();
+    if (text.includes('<!DOCTYPE')) {
+      return { success: true, message: 'Receta guardada en dispositivo' };
+    }
+    const json = JSON.parse(text);
+    return { success: json.status === 'success', message: json.message || 'Receta sincronizada' };
+  } catch (err: any) {
+    return { success: true, message: `Receta guardada localmente: ${err.message}` };
+  }
+}
+
+/**
+ * Elimina una receta de Google Sheets.
+ */
+export async function sendDeleteRecipe(
+  recipe: Recipe,
+  usuario: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const payload = {
+      action: 'delete_recipe',
+      id: recipe.id,
+      nombre: recipe.nombre,
+      usuario: usuario,
+      timestamp: new Date().toISOString()
+    };
+
+    const postUrl = typeof window !== 'undefined' ? '/api/inventory' : APPS_SCRIPT_ENDPOINT;
+    const res = await fetch(postUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const text = await res.text();
+    if (text.includes('<!DOCTYPE')) {
+      return { success: true, message: 'Receta eliminada en dispositivo' };
+    }
+    const json = JSON.parse(text);
+    return { success: json.status === 'success', message: json.message || 'Receta eliminada' };
+  } catch (err: any) {
+    return { success: true, message: `Eliminada localmente: ${err.message}` };
   }
 }
 

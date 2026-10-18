@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Clock, User, ArrowUpRight, ArrowDownRight, Edit3, Trash2 } from 'lucide-react';
+import { Clock, User, ArrowUpRight, ArrowDownRight, Edit3, Trash2, ShieldAlert, ChefHat, Pencil, NotebookPen } from 'lucide-react';
 import { HistoryRecord } from '../lib/types';
 
 interface HistoryViewProps {
@@ -25,6 +25,31 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history }) => {
       }).format(new Date(timestamp));
     } catch {
       return 'Reciente';
+    }
+  };
+
+  const getRecordStyle = (record: HistoryRecord) => {
+    switch (record.tipo) {
+      case 'COMISO':
+        return { badge: 'bg-red-600', icon: <ShieldAlert className="w-3 h-3" />, accent: 'text-red-400' };
+      case 'PREPARACION_PLATO':
+        return { badge: 'bg-emerald-600', icon: <ChefHat className="w-3 h-3" />, accent: 'text-emerald-400' };
+      case 'INFO_EDITADO':
+        return { badge: 'bg-sky-600', icon: <Pencil className="w-3 h-3" />, accent: 'text-sky-400' };
+      case 'RECETA_CREADA':
+      case 'RECETA_EDITADA':
+        return { badge: 'bg-violet-600', icon: <NotebookPen className="w-3 h-3" />, accent: 'text-violet-400' };
+      case 'RECETA_ELIMINADA':
+        return { badge: 'bg-violet-800', icon: <Trash2 className="w-3 h-3" />, accent: 'text-violet-300' };
+      case 'ELIMINACION_PRODUCTO':
+        return { badge: 'bg-red-600', icon: <Trash2 className="w-3 h-3" />, accent: 'text-red-400' };
+      case 'INCREMENTO':
+      case 'COMPRA_RECIBIDA':
+        return { badge: 'bg-emerald-600', icon: <ArrowUpRight className="w-3 h-3" />, accent: 'text-emerald-400' };
+      case 'DECREMENTO':
+        return { badge: 'bg-amber-600', icon: <ArrowDownRight className="w-3 h-3" />, accent: 'text-amber-400' };
+      default:
+        return { badge: 'bg-orange-500', icon: <Edit3 className="w-3 h-3" />, accent: 'text-orange-400' };
     }
   };
 
@@ -67,9 +92,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history }) => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {history.map((record) => {
-            const isUp = record.tipo === 'INCREMENTO' || record.tipo === 'COMPRA_RECIBIDA';
-            const isDown = record.tipo === 'DECREMENTO';
-            const isDelete = record.tipo === 'ELIMINACION_PRODUCTO';
+            const style = getRecordStyle(record);
 
             return (
               <div
@@ -83,10 +106,8 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history }) => {
                     alt={record.itemNombre}
                     className="w-12 h-12 rounded-xl object-cover bg-[#242424] border border-white/[0.08]"
                   />
-                  <div className={`absolute -bottom-1 -right-1 p-0.5 rounded-full text-white text-[9px] shadow-sm ${
-                    isDelete ? 'bg-red-600' : isUp ? 'bg-emerald-600' : isDown ? 'bg-amber-600' : 'bg-orange-500'
-                  }`}>
-                    {isDelete ? <Trash2 className="w-3 h-3" /> : isUp ? <ArrowUpRight className="w-3 h-3" /> : isDown ? <ArrowDownRight className="w-3 h-3" /> : <Edit3 className="w-3 h-3" />}
+                  <div className={`absolute -bottom-1 -right-1 p-0.5 rounded-full text-white text-[9px] shadow-sm ${style.badge}`}>
+                    {style.icon}
                   </div>
                 </div>
 
@@ -105,7 +126,28 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history }) => {
                     {record.detalle}
                   </p>
 
-                  <div className="mt-1 flex items-center gap-1.5 text-[10px] font-semibold text-orange-400">
+                  {/* Comiso detail chips */}
+                  {(record.motivo || record.fechaVencimiento || record.notas) && (
+                    <div className="mt-1 flex items-center flex-wrap gap-1">
+                      {record.motivo && (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-500/15 text-red-300 border border-red-500/25">
+                          {record.motivo}
+                        </span>
+                      )}
+                      {record.fechaVencimiento && (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/25">
+                          Venció: {record.fechaVencimiento}
+                        </span>
+                      )}
+                      {record.notas && (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-[#242424] text-slate-400 border border-white/[0.06] truncate max-w-[180px]">
+                          {record.notas}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  <div className={`mt-1 flex items-center gap-1.5 text-[10px] font-semibold ${style.accent}`}>
                     <User className="w-3 h-3 flex-none" />
                     <span>Realizado por {record.usuario}</span>
                   </div>

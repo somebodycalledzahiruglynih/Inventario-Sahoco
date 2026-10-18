@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Filter, AlertTriangle, Plus, BarChart3, Package, ShoppingCart, Clock } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
-import { ProductItem, HistoryRecord, UserName, MainCategory } from '../lib/types';
+import { ProductItem, HistoryRecord, UserName, MainCategory, ComisoPayload, Recipe, RecipeCategory } from '../lib/types';
 import { 
   getCurrentUser, 
   setCurrentUser, 
@@ -16,8 +16,13 @@ import {
   fetchRemoteProducts, 
   sendStockUpdate, 
   sendNewProduct,
-  sendDeleteProduct
+  sendDeleteProduct,
+  sendBulkStockUpdate,
+  fetchRemoteRecipes,
+  sendSaveRecipe,
+  sendDeleteRecipe
 } from '../lib/apiClient';
+import { getLocalRecipes, saveLocalRecipes, createRecipeId } from '../lib/recipes';
 
 import { LoginScreen } from '../components/LoginScreen';
 import { TopHeader } from '../components/TopHeader';
@@ -28,6 +33,11 @@ import { HistoryView } from '../components/HistoryView';
 import { AddProductModal } from '../components/AddProductModal';
 import { DeleteConfirmModal } from '../components/DeleteConfirmModal';
 import { AnalyticsDashboard } from '../components/AnalyticsDashboard';
+import { ComisoModal } from '../components/ComisoModal';
+import { ProductInfoModal } from '../components/ProductInfoModal';
+import { RecipesView } from '../components/RecipesView';
+import { RecipeFormModal, RecipeFormData } from '../components/RecipeFormModal';
+import { PrepareDishModal, DishDeduction } from '../components/PrepareDishModal';
 
 const CATEGORIES: { id: MainCategory | 'Todos'; label: string; icon: string }[] = [
   { id: 'Todos', label: 'Todos', icon: '✨' },
@@ -44,6 +54,7 @@ export default function MobileSahocoApp() {
   // Data states
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [history, setHistory] = useState<HistoryRecord[]>([]);
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
 
@@ -56,6 +67,22 @@ export default function MobileSahocoApp() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<ProductItem | null>(null);
 
+  // Comiso / Merma module
+  const [comisoItem, setComisoItem] = useState<ProductItem | null>(null);
+  const [isComisoOpen, setIsComisoOpen] = useState(false);
+
+  // Info + quick edit module (derived from products so edits reflect instantly)
+  const [infoItemId, setInfoItemId] = useState<string | null>(null);
+  const infoItem = useMemo(
+    () => (infoItemId ? products.find(p => p.id === infoItemId) || null : null),
+    [products, infoItemId]
+  );
+
+  // Recipes module
+  const [isRecipeFormOpen, setIsRecipeFormOpen] = useState(false);
+  const [recipeToEdit, setRecipeToEdit] = useState<Recipe | null>(null);
+  const [recipeToPrepare, setRecipeToPrepare] = useState<Recipe | null>(null);
+
   // 1. Check Login Session on mount
   useEffect(() => {
     const savedUser = getCurrentUser();
@@ -64,11 +91,13 @@ export default function MobileSahocoApp() {
     // Load cached products & history (zero fake data)
     setProducts(getLocalProducts());
     setHistory(getLocalHistory());
+    setRecipes(getLocalRecipes());
     setIsInitializing(false);
 
     // Initial background sync
     if (savedUser) {
       handleSync();
+      handleSyncRecipes();
     }
   }, []);
 
@@ -103,16 +132,30 @@ export default function MobileSahocoApp() {
     }
   };
 
-  // Add History Record helper
+  // Sync recipes with Google Sheets (pestaña "Recetas"), con respaldo local
+  const handleSyncRecipes = async () => {
+    try {
+      const remote = await fetchRemoteRecipes();
+      if (remote && remote.length > 0) {
+        setRecipes(remote);
+        saveLocalRecipes(remote);
+      }
+    } catch (e: any) {
+      console.warn('Recipes sync notice:', e.message || e);
+    }
+  };
+
+  // Add History Record helper (functional update: soporta varias entradas seguidas)
   const addHistoryEntry = (
     item: ProductItem,
     tipo: HistoryRecord['tipo'],
     detalle: string,
     cantidadAnterior?: number,
-    cantidadNueva?: number
+    cantidadNueva?: number,
+    extras?: Pick<HistoryRecord, 'motivo' | 'fechaVencimiento' | 'notas'>
   ) => {
     const newEntry: HistoryRecord = {
-      id: `HIST-${Date.now().toString().slice(-4)}`,
+      id: `HIST-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
       timestamp: new Date().toISOString(),
       usuario: currentUser || 'SAHOCO',
       itemId: item.id,
@@ -121,12 +164,38 @@ export default function MobileSahocoApp() {
       tipo,
       detalle,
       cantidadAnterior,
-      cantidadNueva
+      cantidadNueva,
+      ...(extras || {})
     };
 
-    const updated = [newEntry, ...history];
-    setHistory(updated);
-    saveLocalHistory(updated);
+    setHistory(prev => {
+      const updated = [newEntry, ...prev];
+      saveLocalHistory(updated);
+      return updated;
+    });
+  };
+
+  // Add History entry for non-product events (recetas, etc.)
+  const addGeneralHistoryEntry = (
+    tipo: HistoryRecord['tipo'],
+    itemNombre: string,
+    detalle: string
+  ) => {
+    const newEntry: HistoryRecord = {
+      id: `HIST-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+      timestamp: new Date().toISOString(),
+      usuario: currentUser || 'SAHOCO',
+      itemId: `SYS-${Date.now().toString(36)}`,
+      itemNombre,
+      tipo,
+      detalle
+    };
+
+    setHistory(prev => {
+      const updated = [newEntry, ...prev];
+      saveLocalHistory(updated);
+      return updated;
+    });
   };
 
   // Stock Delta Adjustment [ - ] and [ + ] (Operational consumption / addition)
@@ -264,6 +333,230 @@ export default function MobileSahocoApp() {
     }
   };
 
+  // ── MÓDULO 1: COMISO / MERMA ──
+  const handleRequestComiso = (product: ProductItem | null) => {
+    setComisoItem(product);
+    setIsComisoOpen(true);
+  };
+
+  const handleConfirmComiso = async (product: ProductItem, payload: ComisoPayload) => {
+    const current = products.find(p => p.id === product.id);
+    if (!current) throw new Error('El insumo ya no existe en el inventario.');
+
+    const prevStock = current.stockActual;
+    const newStock = Math.max(0, Number((prevStock - payload.cantidad).toFixed(2)));
+
+    const updated = products.map(p => (p.id === product.id ? { ...p, stockActual: newStock } : p));
+    setProducts(updated);
+    saveLocalProducts(updated);
+
+    const detailParts = [
+      `Comiso/Merma de ${payload.cantidad} ${current.unidad} (stock: ${prevStock} → ${newStock})`,
+      `Motivo: ${payload.motivo}`
+    ];
+    if (payload.fechaVencimiento) detailParts.push(`Venció: ${payload.fechaVencimiento}`);
+    if (payload.notas) detailParts.push(`Nota: ${payload.notas}`);
+
+    addHistoryEntry(
+      current,
+      'COMISO',
+      detailParts.join(' • '),
+      prevStock,
+      newStock,
+      {
+        motivo: payload.motivo,
+        fechaVencimiento: payload.fechaVencimiento,
+        notas: payload.notas
+      }
+    );
+
+    try {
+      await sendStockUpdate(
+        current,
+        newStock,
+        current.cantidadSugerida,
+        currentUser || 'SAHOCO',
+        undefined,
+        payload
+      );
+    } catch (err) {
+      console.warn('Comiso sync notice:', err);
+    }
+  };
+
+  // ── MÓDULO 3: FICHA + EDICIÓN RÁPIDA DE INSUMO ──
+  const handleSaveProductInfo = async (updatedProduct: ProductItem) => {
+    const original = products.find(p => p.id === updatedProduct.id);
+    if (!original) throw new Error('El insumo ya no existe en el inventario.');
+
+    const finalProduct: ProductItem = {
+      ...updatedProduct,
+      ultimaModificacion: new Date().toISOString(),
+      modificadoPor: currentUser || 'SAHOCO'
+    };
+
+    const withMeta = products.map(p => (p.id === finalProduct.id ? finalProduct : p));
+    setProducts(withMeta);
+    saveLocalProducts(withMeta);
+
+    const changes: string[] = [];
+    if (original.nombre !== finalProduct.nombre) changes.push(`nombre: "${original.nombre}" → "${finalProduct.nombre}"`);
+    if (original.suplidor !== finalProduct.suplidor) changes.push(`suplidor: "${original.suplidor}" → "${finalProduct.suplidor}"`);
+    if (original.categoria !== finalProduct.categoria) changes.push(`categoría: "${original.categoria}" → "${finalProduct.categoria}"`);
+    if (original.unidad !== finalProduct.unidad) changes.push(`unidad: "${original.unidad}" → "${finalProduct.unidad}"`);
+    if (original.stockActual !== finalProduct.stockActual) changes.push(`stock: ${original.stockActual} → ${finalProduct.stockActual}`);
+    if (original.stockMinimo !== finalProduct.stockMinimo) changes.push(`mínimo: ${original.stockMinimo} → ${finalProduct.stockMinimo}`);
+    if (original.stockMaximo !== finalProduct.stockMaximo) changes.push(`máximo: ${original.stockMaximo} → ${finalProduct.stockMaximo}`);
+    if (original.cantidadSugerida !== finalProduct.cantidadSugerida) changes.push(`sugerido: ${original.cantidadSugerida} → ${finalProduct.cantidadSugerida}`);
+    if (original.fechaVencimiento !== finalProduct.fechaVencimiento) changes.push(`vencimiento: "${original.fechaVencimiento || '—'}" → "${finalProduct.fechaVencimiento || '—'}"`);
+    if (original.descripcion !== finalProduct.descripcion) changes.push('descripción actualizada');
+    if (original.foto !== finalProduct.foto) changes.push('fotografía actualizada');
+
+    addHistoryEntry(
+      finalProduct,
+      'INFO_EDITADO',
+      changes.length > 0
+        ? `Actualizó información: ${changes.join(', ')}`
+        : 'Guardó la ficha del insumo (sin cambios detectados)'
+    );
+
+    try {
+      await sendStockUpdate(
+        finalProduct,
+        finalProduct.stockActual,
+        finalProduct.cantidadSugerida,
+        currentUser || 'SAHOCO',
+        finalProduct
+      );
+    } catch (err) {
+      console.warn('Info update sync notice:', err);
+    }
+  };
+
+  // ── MÓDULO 2: RECETAS ──
+  const handleOpenCreateRecipe = () => {
+    setRecipeToEdit(null);
+    setIsRecipeFormOpen(true);
+  };
+
+  const handleOpenEditRecipe = (recipe: Recipe) => {
+    setRecipeToEdit(recipe);
+    setIsRecipeFormOpen(true);
+  };
+
+  const handleSaveRecipe = async (data: RecipeFormData) => {
+    const now = new Date().toISOString();
+
+    if (recipeToEdit) {
+      const updatedRecipe: Recipe = {
+        ...recipeToEdit,
+        nombre: data.nombre,
+        categoria: data.categoria as RecipeCategory,
+        descripcion: data.descripcion,
+        ingredientes: data.ingredientes,
+        updatedAt: now
+      };
+      const updated = recipes.map(r => (r.id === updatedRecipe.id ? updatedRecipe : r));
+      setRecipes(updated);
+      saveLocalRecipes(updated);
+      addGeneralHistoryEntry('RECETA_EDITADA', updatedRecipe.nombre, `Editó la receta "${updatedRecipe.nombre}" (${updatedRecipe.ingredientes.length} ingredientes)`);
+      try {
+        await sendSaveRecipe(updatedRecipe, currentUser || 'SAHOCO');
+      } catch (err) {
+        console.warn('Recipe sync notice:', err);
+      }
+    } else {
+      const newRecipe: Recipe = {
+        id: createRecipeId(),
+        nombre: data.nombre,
+        categoria: data.categoria as RecipeCategory,
+        descripcion: data.descripcion,
+        ingredientes: data.ingredientes,
+        creadoPor: currentUser || 'SAHOCO',
+        createdAt: now,
+        updatedAt: now
+      };
+      const updated = [newRecipe, ...recipes];
+      setRecipes(updated);
+      saveLocalRecipes(updated);
+      addGeneralHistoryEntry('RECETA_CREADA', newRecipe.nombre, `Creó la receta "${newRecipe.nombre}" con ${newRecipe.ingredientes.length} ingredientes`);
+      try {
+        await sendSaveRecipe(newRecipe, currentUser || 'SAHOCO');
+      } catch (err) {
+        console.warn('Recipe sync notice:', err);
+      }
+    }
+  };
+
+  const handleDeleteRecipe = async (recipe: Recipe) => {
+    const updated = recipes.filter(r => r.id !== recipe.id);
+    setRecipes(updated);
+    saveLocalRecipes(updated);
+    addGeneralHistoryEntry('RECETA_ELIMINADA', recipe.nombre, `Eliminó la receta "${recipe.nombre}"`);
+    try {
+      await sendDeleteRecipe(recipe, currentUser || 'SAHOCO');
+    } catch (err) {
+      console.warn('Recipe delete notice:', err);
+    }
+  };
+
+  // Deducción quirúrgica al preparar un plato (con modificaciones y extras)
+  const handleConfirmPreparation = async (recipe: Recipe, deductions: DishDeduction[]) => {
+    if (deductions.length === 0) return;
+
+    const stockUpdates = new Map<string, number>();
+    const auditEntries: Array<{ product: ProductItem; cantidad: number; prev: number; next: number }> = [];
+
+    deductions.forEach(d => {
+      const current = products.find(p => p.id === d.product.id);
+      if (!current) return;
+      const prev = current.stockActual;
+      const next = Math.max(0, Number((prev - d.cantidad).toFixed(2)));
+      stockUpdates.set(current.id, next);
+      auditEntries.push({ product: current, cantidad: d.cantidad, prev, next });
+    });
+
+    if (auditEntries.length === 0) return;
+
+    // 1. Actualización optimista e íntegra del stock local
+    const updated = products.map(p => {
+      const next = stockUpdates.get(p.id);
+      return next !== undefined ? { ...p, stockActual: next } : p;
+    });
+    setProducts(updated);
+    saveLocalProducts(updated);
+
+    // 2. Auditoría detallada por ingrediente
+    setHistory(prev => {
+      const newEntries: HistoryRecord[] = auditEntries.map(({ product, cantidad, prev: p0, next }) => ({
+        id: `HIST-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+        timestamp: new Date().toISOString(),
+        usuario: currentUser || 'SAHOCO',
+        itemId: product.id,
+        itemNombre: product.nombre,
+        itemFoto: product.foto,
+        tipo: 'PREPARACION_PLATO' as const,
+        detalle: `Usado en preparación de "${recipe.nombre}" (-${cantidad} ${product.unidad}, stock: ${p0} → ${next})`,
+        cantidadAnterior: p0,
+        cantidadNueva: next
+      }));
+      const merged = [...newEntries, ...prev];
+      saveLocalHistory(merged);
+      return merged;
+    });
+
+    // 3. Sincronización en lote tolerante a fallos (cada insumo es independiente)
+    try {
+      await sendBulkStockUpdate(
+        auditEntries.map(e => ({ product: { ...e.product, stockActual: e.next }, newStock: e.next })),
+        currentUser || 'SAHOCO',
+        `Preparación de plato "${recipe.nombre}" (${auditEntries.length} insumos)`
+      );
+    } catch (err) {
+      console.warn('Dish prep sync notice:', err);
+    }
+  };
+
   // Filtered products for Inventory View
   const filteredProducts = useMemo(() => {
     return products.filter(p => {
@@ -326,6 +619,8 @@ export default function MobileSahocoApp() {
             products={products}
             history={history}
             onNavigateToShopping={() => setCurrentTab('shopping')}
+            onRequestComiso={() => handleRequestComiso(null)}
+            onNavigateToRecipes={() => setCurrentTab('recipes')}
           />
         )}
 
@@ -469,12 +764,26 @@ export default function MobileSahocoApp() {
                     onUpdateSugerido={handleUpdateSugerido}
                     onUpdatePhoto={handleUpdatePhoto}
                     onRequestDelete={(p) => setItemToDelete(p)}
+                    onRequestComiso={(p) => handleRequestComiso(p)}
+                    onRequestInfo={(p) => setInfoItemId(p.id)}
                   />
                 ))}
               </div>
             )}
 
           </div>
+        )}
+
+        {/* TAB 2.5: RECETAS DEL MENÚ & PREPARACIÓN INTELIGENTE */}
+        {currentTab === 'recipes' && (
+          <RecipesView
+            recipes={recipes}
+            products={products}
+            onCreateRecipe={handleOpenCreateRecipe}
+            onEditRecipe={handleOpenEditRecipe}
+            onDeleteRecipe={handleDeleteRecipe}
+            onPrepareRecipe={(recipe) => setRecipeToPrepare(recipe)}
+          />
         )}
 
         {/* TAB 3: LISTA DE COMPRAS ESTÉTICA */}
@@ -519,6 +828,47 @@ export default function MobileSahocoApp() {
         item={itemToDelete}
         onClose={() => setItemToDelete(null)}
         onConfirmDelete={handleConfirmDeleteProduct}
+      />
+
+      {/* 6. Comiso / Merma Modal (desde tarjeta o panel de control) */}
+      <ComisoModal
+        isOpen={isComisoOpen}
+        product={comisoItem}
+        products={products}
+        onClose={() => {
+          setIsComisoOpen(false);
+          setComisoItem(null);
+        }}
+        onConfirm={handleConfirmComiso}
+      />
+
+      {/* 7. Ficha de Información + Edición Rápida */}
+      <ProductInfoModal
+        isOpen={!!infoItem}
+        product={infoItem}
+        onClose={() => setInfoItemId(null)}
+        onSave={handleSaveProductInfo}
+      />
+
+      {/* 8. Crear / Editar Receta */}
+      <RecipeFormModal
+        isOpen={isRecipeFormOpen}
+        recipe={recipeToEdit}
+        products={products}
+        onClose={() => {
+          setIsRecipeFormOpen(false);
+          setRecipeToEdit(null);
+        }}
+        onSave={handleSaveRecipe}
+      />
+
+      {/* 9. Preparar Plato (Modo Cocina con modificaciones) */}
+      <PrepareDishModal
+        isOpen={!!recipeToPrepare}
+        recipe={recipeToPrepare}
+        products={products}
+        onClose={() => setRecipeToPrepare(null)}
+        onConfirm={handleConfirmPreparation}
       />
 
     </div>

@@ -20,6 +20,20 @@ export interface ProductItem {
   modificadoPor?: string;
 }
 
+export type HistoryTipo =
+  | 'INCREMENTO'
+  | 'DECREMENTO'
+  | 'SUGERIDO_EDITADO'
+  | 'NUEVO_PRODUCTO'
+  | 'ELIMINACION_PRODUCTO'
+  | 'COMPRA_RECIBIDA'
+  | 'COMISO'
+  | 'PREPARACION_PLATO'
+  | 'INFO_EDITADO'
+  | 'RECETA_CREADA'
+  | 'RECETA_EDITADA'
+  | 'RECETA_ELIMINADA';
+
 export interface HistoryRecord {
   id: string;
   timestamp: string;
@@ -27,10 +41,59 @@ export interface HistoryRecord {
   itemId: string;
   itemNombre: string;
   itemFoto?: string;
-  tipo: 'INCREMENTO' | 'DECREMENTO' | 'SUGERIDO_EDITADO' | 'NUEVO_PRODUCTO' | 'ELIMINACION_PRODUCTO' | 'COMPRA_RECIBIDA';
+  tipo: HistoryTipo;
   detalle: string;
   cantidadAnterior?: number;
   cantidadNueva?: number;
+  motivo?: string;
+  fechaVencimiento?: string;
+  notas?: string;
+}
+
+// ── Módulo de Comisos / Mermas ──
+export type MotivoComiso = 'Vencimiento' | 'Daño físico' | 'Error de preparación' | 'Otro';
+
+export const MOTIVOS_COMISO: MotivoComiso[] = [
+  'Vencimiento',
+  'Daño físico',
+  'Error de preparación',
+  'Otro'
+];
+
+export interface ComisoPayload {
+  cantidad: number;
+  motivo: MotivoComiso;
+  fechaVencimiento?: string;
+  notas?: string;
+}
+
+// ── Sistema de Recetas ──
+export type RecipeCategory = 'Salado' | 'Postres' | 'Bebidas' | 'Otros';
+
+export const RECIPE_CATEGORIES: { id: RecipeCategory; label: string; icon: string }[] = [
+  { id: 'Salado', label: 'Salado', icon: '🍟' },
+  { id: 'Postres', label: 'Postres', icon: '🍰' },
+  { id: 'Bebidas', label: 'Bebidas', icon: '🥤' },
+  { id: 'Otros', label: 'Otros', icon: '✨' }
+];
+
+export interface RecipeIngredient {
+  productId: string;
+  rowIndex: number;
+  nombre: string;
+  cantidad: number;
+  unidad: string;
+}
+
+export interface Recipe {
+  id: string;
+  nombre: string;
+  categoria: RecipeCategory;
+  descripcion?: string;
+  ingredientes: RecipeIngredient[];
+  creadoPor?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export const AUTHORIZED_USERS = [

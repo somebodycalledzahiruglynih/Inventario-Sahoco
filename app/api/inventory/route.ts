@@ -1,13 +1,15 @@
 import { NextResponse } from 'next/server';
+import { resolveAppsScriptUrl } from '../../../lib/appsScriptUrl';
 
-const APPS_SCRIPT_URL =
-  process.env.NEXT_PUBLIC_APPS_SCRIPT_URL ||
-  'https://script.google.com/macros/s/AKfycbxC6VFpj8pijG8DoNd6F-L3bPVoa0PX-43qxqdzCfQBwe5xJJl1xkEeAoECA64Cg5Ey/exec';
+const APPS_SCRIPT_URL = resolveAppsScriptUrl(process.env.NEXT_PUBLIC_APPS_SCRIPT_URL);
 
-// GET /api/inventory
-export async function GET() {
+// GET /api/inventory  (opcional: ?action=get_recipes)
+export async function GET(req: Request) {
   try {
-    const res = await fetch(`${APPS_SCRIPT_URL}?action=get`, {
+    const action = new URL(req.url).searchParams.get('action') || 'get';
+    const safeAction = /^[a-z_]{1,30}$/i.test(action) ? action : 'get';
+
+    const res = await fetch(`${APPS_SCRIPT_URL}?action=${encodeURIComponent(safeAction)}`, {
       method: 'GET',
       headers: { Accept: 'application/json' },
       redirect: 'follow',

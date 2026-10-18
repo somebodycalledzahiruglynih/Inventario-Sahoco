@@ -1,9 +1,9 @@
 'use client';
 
 import React from 'react';
-import { Package, ShoppingCart, Clock, Plus, BarChart3 } from 'lucide-react';
+import { Package, ShoppingCart, Clock, Plus, BarChart3, ChefHat } from 'lucide-react';
 
-export type ActiveTab = 'inventory' | 'analytics' | 'shopping' | 'history';
+export type ActiveTab = 'inventory' | 'analytics' | 'shopping' | 'history' | 'recipes';
 
 interface BottomNavProps {
   currentTab: ActiveTab;
@@ -37,7 +37,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           <div className={iconWrapper('analytics')}>
             <BarChart3 className="w-5 h-5" />
           </div>
-          <span className="text-[10px] mt-0.5">Analítica</span>
+          <span className="text-[9px] mt-0.5">Analítica</span>
         </button>
 
         {/* Insumos */}
@@ -45,11 +45,11 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           <div className={iconWrapper('inventory')}>
             <Package className="w-5 h-5" />
           </div>
-          <span className="text-[10px] mt-0.5">Insumos</span>
+          <span className="text-[9px] mt-0.5">Insumos</span>
         </button>
 
         {/* Central Add Button */}
-        <div className="flex-none px-1.5 -mt-5">
+        <div className="flex-none px-1 -mt-5">
           <button
             onClick={onOpenAddModal}
             className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-orange-600 to-orange-400 text-white shadow-[0_0_20px_rgba(249,115,22,0.35)] hover:scale-105 active:scale-95 transition-all flex items-center justify-center"
@@ -58,6 +58,14 @@ export const BottomNav: React.FC<BottomNavProps> = ({
             <Plus className="w-6 h-6 stroke-[2.5]" />
           </button>
         </div>
+
+        {/* Recetas */}
+        <button onClick={() => onSelectTab('recipes')} className={tabClass('recipes')}>
+          <div className={iconWrapper('recipes')}>
+            <ChefHat className="w-5 h-5" />
+          </div>
+          <span className="text-[9px] mt-0.5">Recetas</span>
+        </button>
 
         {/* Compras */}
         <button onClick={() => onSelectTab('shopping')} className={`${tabClass('shopping')} relative`}>
@@ -69,7 +77,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
               </span>
             )}
           </div>
-          <span className="text-[10px] mt-0.5">Compras</span>
+          <span className="text-[9px] mt-0.5">Compras</span>
         </button>
 
         {/* Historial */}
@@ -77,7 +85,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           <div className={iconWrapper('history')}>
             <Clock className="w-5 h-5" />
           </div>
-          <span className="text-[10px] mt-0.5">Auditoría</span>
+          <span className="text-[9px] mt-0.5">Auditoría</span>
         </button>
 
       </div>
