@@ -18,8 +18,7 @@ import { ProductThumb } from './ProductThumb';
 
 interface ShoppingListViewProps {
   products: ProductItem[];
-  onRequestRestock: (product: ProductItem) => void;
-  onOpenRestock?: (product: ProductItem) => void;
+  onOpenRestock: (product: ProductItem) => void;
   onUpdateSugerido: (product: ProductItem, newSugerido: number) => void;
 }
 
@@ -33,7 +32,6 @@ const REPOSICION_CATEGORIES: { id: MainCategory | 'Todos'; label: string; icon: 
 
 export const ShoppingListView: React.FC<ShoppingListViewProps> = ({
   products,
-  onRequestRestock,
   onOpenRestock,
   onUpdateSugerido: _onUpdateSugerido
 }) => {
@@ -169,7 +167,7 @@ export const ShoppingListView: React.FC<ShoppingListViewProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {priorityCriticalItems.map(item => {
               const isOutOfStock = item.stockActual <= 0;
-              const openRestock = () => (onOpenRestock || onRequestRestock)(item);
+              const openRestock = () => onOpenRestock(item);
               return (
                 <div
                   key={`priority-${item.id}`}
@@ -415,7 +413,17 @@ export const ShoppingListView: React.FC<ShoppingListViewProps> = ({
                       return (
                         <div 
                           key={`${item.id}-${item.rowIndex || idx}`} 
-                          className="py-2.5 flex items-center justify-between gap-3"
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => onOpenRestock(item)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              onOpenRestock(item);
+                            }
+                          }}
+                          title="Toca para ver la información y reponer"
+                          className="py-2.5 flex items-center justify-between gap-3 -mx-2 px-2 rounded-xl cursor-pointer hover:bg-white/[0.04] active:scale-[0.99] transition-all focus:outline-none focus:bg-white/[0.04]"
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
                             <ProductThumb
@@ -457,7 +465,10 @@ export const ShoppingListView: React.FC<ShoppingListViewProps> = ({
                           {/* Action Button: Reponer Stock / Registrar Entrada */}
                           <div className="flex items-center gap-2 flex-none">
                             <button
-                              onClick={() => onRequestRestock(item)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenRestock(item);
+                              }}
                               className="flex items-center gap-1.5 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-[0_0_12px_rgba(16,185,129,0.3)] active:scale-95 transition-all"
                               title="Registrar entrada de insumo"
                             >

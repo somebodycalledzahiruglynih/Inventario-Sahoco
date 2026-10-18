@@ -1205,10 +1205,6 @@ export default function MobileSahocoApp() {
         {currentTab === 'shopping' && (
           <ShoppingListView
             products={products}
-            onRequestRestock={(product) => {
-              const qty = product.cantidadSugerida || Math.max(1, product.stockMaximo - product.stockActual);
-              handleRestockItem(product, qty);
-            }}
             onOpenRestock={(product) => setRestockItem(product)}
             onUpdateSugerido={handleUpdateSugerido}
           />
