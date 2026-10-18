@@ -106,20 +106,10 @@ export const AUTHORIZED_USERS = [
   { name: 'Hugo', avatar: '👤' },
   { name: 'Leo', avatar: '👤' },
   { name: 'Rosalia', avatar: '👤' },
+  { name: 'Cecilio', avatar: '👤' },
   { name: 'SAHOCO', avatar: '🏢' },
 ] as const;
 
 export type UserName = typeof AUTHORIZED_USERS[number]['name'];
-
-// Rol / puesto en cocina por usuario (menú de perfil del header)
-export const USER_ROLES: Record<UserName, string> = {
-  Zahir: 'Administrador General',
-  Alba: 'Chef de Cocina',
-  Elmy: 'Repostería & Postres',
-  Hugo: 'Cocina & Freidora',
-  Leo: 'Almacén & Compras',
-  Rosalia: 'Almacén & Compras',
-  SAHOCO: 'Cuenta Central del Negocio',
-};
 
 export const AUTH_PASSWORD = 's4hoco2026';

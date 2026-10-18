@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RefreshCw, LogOut, User, Settings, ChevronDown } from 'lucide-react';
-import { UserName, AUTHORIZED_USERS, USER_ROLES } from '../lib/types';
+import { UserName, AUTHORIZED_USERS } from '../lib/types';
 
 interface TopHeaderProps {
   currentUser: UserName;
@@ -117,7 +117,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                 >
                   <div className="px-4 py-3 border-b border-white/[0.06] bg-[#1f1f1f]/60">
                     <p className="text-xs font-bold text-white">{currentUser}</p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">{USER_ROLES[currentUser]}</p>
                   </div>
 
                   <div className="p-1.5">

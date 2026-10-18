@@ -2,8 +2,8 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChefHat, LogOut, X, UserCircle2 } from 'lucide-react';
-import { UserName, AUTHORIZED_USERS, USER_ROLES } from '../lib/types';
+import { LogOut, X, UserCircle2 } from 'lucide-react';
+import { UserName, AUTHORIZED_USERS } from '../lib/types';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -49,16 +49,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               </button>
             </div>
 
-            {/* Avatar + nombre + rol */}
+            {/* Avatar + nombre */}
             <div className="px-5 pb-4 flex flex-col items-center text-center">
               <div className="w-20 h-20 rounded-full bg-orange-500/15 border-2 border-orange-500/40 flex items-center justify-center text-4xl shadow-[0_0_25px_rgba(249,115,22,0.25)]">
                 {userInfo?.avatar || '👤'}
               </div>
               <h2 className="text-lg font-bold text-white mt-3">{currentUser}</h2>
-              <span className="mt-1.5 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#242424] border border-white/[0.08] text-[11px] font-bold text-orange-400">
-                <ChefHat className="w-3.5 h-3.5" />
-                {USER_ROLES[currentUser]}
-              </span>
             </div>
 
             {/* Info básica */}
@@ -69,13 +65,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   Nombre completo
                 </span>
                 <span className="text-xs font-bold text-slate-200">{currentUser}</span>
-              </div>
-              <div className="flex items-center justify-between px-4 py-2.5">
-                <span className="flex items-center gap-2 text-[11px] font-semibold text-slate-400">
-                  <ChefHat className="w-3.5 h-3.5 text-orange-400" />
-                  Puesto en cocina
-                </span>
-                <span className="text-xs font-bold text-slate-200">{USER_ROLES[currentUser]}</span>
               </div>
               <div className="flex items-center justify-between px-4 py-2.5">
                 <span className="text-[11px] font-semibold text-slate-400">Estado de sesión</span>

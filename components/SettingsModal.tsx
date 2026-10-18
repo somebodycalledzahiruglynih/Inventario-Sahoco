@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Settings, Flame, Search, X, Info, Server, Timer, ShieldCheck } from 'lucide-react';
-import { ProductItem, UserName, USER_ROLES } from '../lib/types';
+import { ProductItem, UserName } from '../lib/types';
 import { getBatchWindowMs } from '../lib/pendingChanges';
 import { APPS_SCRIPT_ENDPOINT } from '../lib/appsScriptUrl';
 
@@ -201,7 +201,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       Sesión activa
                     </span>
                     <span className="text-xs font-bold text-slate-200">
-                      {currentUser} · {USER_ROLES[currentUser]}
+                      {currentUser}
                     </span>
                   </div>
                   <div className="flex items-center justify-between px-4 py-3">
