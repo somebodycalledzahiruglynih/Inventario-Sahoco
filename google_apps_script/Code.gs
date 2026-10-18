@@ -1,1000 +1,361 @@
-/**
- * ==============================================================================
- * SAHOCO INVENTARIO & GESTIÓN MÓVIL - GOOGLE APPS SCRIPT
- * Archivo: Código.gs / Code.gs
- * ==============================================================================
- * CARGA COMPLETA DE LOS 131 PRODUCTOS DE LA HOJA "Inv."
- *
- * ACCIONES SOPORTADAS:
- *  - get / get_inventory ........ Lee el inventario completo de "Inv."
- *  - update ..................... Actualiza stock, sugerido y campos de ficha.
- *                                 Si incluye "comiso" → auditoría + correo.
- *  - add / delete ............... Crear y eliminar insumos.
- *  - bulk_update ................ Descuento en lote (preparación de platos).
- *  - get_recipes / save_recipe / delete_recipe .. Recetas en pestaña "Recetas".
- *
- * NOTIFICACIONES POR CORREO:
- *  Configura la lista SAHOCO_EMAIL_NOTIFICACIONES (abajo) con los correos que
- *  deben recibir las alertas de comisos/mermas. Si está vacía, no se envía
- *  correo y el sistema sigue funcionando igual.
- *
- * INSTRUCCIONES DE INSTALACIÓN EN GOOGLE SHEETS:
- * 1. En tu hoja de cálculo de Google Sheets, ve a: Extensiones > Apps Script.
- * 2. Borra el código existente y pega este archivo completo.
- * 3. Si tu Apps Script está vinculado a la hoja (Extensiones > Apps Script),
- *    no necesitas modificar GOOGLE_SHEET_ID. Si es un script independiente,
- *    coloca el ID de tu hoja en GOOGLE_SHEET_ID abajo.
- * 4. Haz clic en "Implementar" > "Gestionar implementaciones" > Edita la activa
- *    (o crea "Nueva implementación" > Tipo: "Aplicación web"):
- *    - Ejecutar como: "Yo" (tu cuenta)
- *    - Quién tiene acceso: "Cualquiera" (Anyone)
- * 5. Haz clic en "Implementar" y copia la URL terminada en /exec.
- * ==============================================================================
- */
+// ====================================================================
+// SAHOCO API BACKEND - CONTROLADOR PRINCIPAL Y RUTAS (`Código.gs`)
+// ====================================================================
 
-// Opcional: Solo si el script NO está vinculado directamente a la hoja de cálculo.
-const GOOGLE_SHEET_ID = "";
+function doGet(e) {
+  return handleRequest(e);
+}
 
-// Nombres posibles para la pestaña de inventario (prioridad a "Inv.")
-const TARGET_SHEET_NAMES = ["Inv.", "Inv", "Inventario", "INVENTARIO", "INV."];
-const SHEET_AUDITORIA = "Auditoria";
+function doPost(e) {
+  return handleRequest(e);
+}
 
-// ── EXPANSIÓN SAHOCO: Comisos / Recetas / Notificaciones ──
-// Correos que reciben las alertas: ajustes de stock, comisos/mermas y eliminaciones.
-// Deja la lista vacía [] para desactivar todos los correos.
-const SAHOCO_EMAIL_NOTIFICACIONES = ["soyzahirxd@gmail.com", "somebodycallezahir@gmail.com"];
-const SAHOCO_SHEET_COMISOS = "Comisos";
-const SAHOCO_SHEET_RECETAS = "Recetas";
+function getSpreadsheet() {
+  try {
+    var activeSS = SpreadsheetApp.getActiveSpreadsheet();
+    if (activeSS) return activeSS;
+  } catch (err) {}
 
-/**
- * Obtiene la hoja de cálculo activa o por ID
- */
-function getTargetSpreadsheet() {
-  if (GOOGLE_SHEET_ID && GOOGLE_SHEET_ID.trim().length > 10) {
-    return SpreadsheetApp.openById(GOOGLE_SHEET_ID.trim());
-  }
-  const active = SpreadsheetApp.getActiveSpreadsheet();
-  if (active) return active;
-  // Respaldo para proyectos independientes: buscar el archivo por nombre
-  const files = DriveApp.getFilesByName("INVENTARIO SAHOCO");
+  var files = DriveApp.getFilesByName("INVENTARIO SAHOCO");
   if (files.hasNext()) {
     return SpreadsheetApp.open(files.next());
   }
-  throw new Error("No se encontró la hoja de cálculo. Vincula el script desde Extensiones > Apps Script, o define GOOGLE_SHEET_ID (línea 36) con el ID de tu hoja.");
+
+  throw new Error("No se encontró la hoja 'INVENTARIO SAHOCO' en Google Drive.");
 }
 
-/**
- * Encuentra la hoja de inventario (buscando 'Inv.' prioritariamente)
- */
-function getInventorySheet(ss) {
-  for (let i = 0; i < TARGET_SHEET_NAMES.length; i++) {
-    const sheet = ss.getSheetByName(TARGET_SHEET_NAMES[i]);
-    if (sheet) return sheet;
-  }
-  // Si no encuentra con los nombres esperados, toma la primera pestaña visible
-  const allSheets = ss.getSheets();
-  if (allSheets && allSheets.length > 0) {
-    return allSheets[0];
-  }
-  throw new Error("No se encontró ninguna pestaña en la hoja de cálculo.");
-}
-
-/**
- * Normaliza textos para búsqueda de encabezados
- */
-function cleanHeader(val) {
-  if (!val) return "";
-  return String(val)
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim();
-}
-
-/**
- * Auto-clasifica categoría según el nombre del insumo
- */
-function autoClassify(nombre, existingCat) {
-  const cat = cleanHeader(existingCat);
-  const n = cleanHeader(nombre);
-
-  if (cat.indexOf("postre") !== -1 || cat.indexOf("reposter") !== -1 || cat.indexOf("synthia") !== -1 ||
-      n.indexOf("tres leches") !== -1 || n.indexOf("cheesecake") !== -1 || n.indexOf("flan") !== -1 ||
-      n.indexOf("gelatina") !== -1 || n.indexOf("bizcocho") !== -1 || n.indexOf("oreo") !== -1 || n.indexOf("torta") !== -1) {
-    return "Postres & Repostería";
-  }
-
-  if (cat.indexOf("bebida") !== -1 || cat.indexOf("jugo") !== -1 || cat.indexOf("refresco") !== -1 || cat.indexOf("topping") !== -1 ||
-      n.indexOf("coca") !== -1 || n.indexOf("agua") !== -1 || n.indexOf("syrup") !== -1 ||
-      n.indexOf("nutella") !== -1 || n.indexOf("soda") !== -1 || n.indexOf("jugo") !== -1 || n.indexOf("sirope") !== -1) {
-    return "Bebidas";
-  }
-
-  if (cat.indexOf("desechable") !== -1 || cat.indexOf("empaque") !== -1 || cat.indexOf("envase") !== -1 ||
-      n.indexOf("vaso") !== -1 || n.indexOf("caja") !== -1 || n.indexOf("funda") !== -1 ||
-      n.indexOf("tenedor") !== -1 || n.indexOf("cuchara") !== -1 || n.indexOf("tapa") !== -1 ||
-      n.indexOf("servilleta") !== -1 || n.indexOf("plato") !== -1 || n.indexOf("bolsa") !== -1) {
-    return "Desechables & Empaques";
-  }
-
-  return "Insumos & Salado";
-}
-
-/**
- * Detecta el mapa de columnas (0-based) de la hoja de inventario.
- * Se utiliza tanto en "get" como en "update"/"bulk_update" para mantener
- * simetría exacta entre lectura y escritura.
- */
-function detectColumnMap(sheet, lastCol) {
-  const headerRow2 = sheet.getRange(2, 1, 1, lastCol).getValues()[0];
-  const headerRow1 = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
-
-  let colId = -1;
-  let colNombre = -1;
-  let colCategoria = -1;
-  let colSuplidor = -1;
-  let colUnidad = -1;
-  let colActual = -1;
-  let colMin = -1;
-  let colMax = -1;
-  let colSugerido = -1;
-  let colDescripcion = -1;
-  let colVencimiento = -1;
-  let colFoto = -1;
-
-  for (let c = 0; c < lastCol; c++) {
-    const h = cleanHeader(headerRow2[c]) || cleanHeader(headerRow1[c]);
-    if (!h) continue;
-
-    if (colId === -1 && (h === "id" || h === "codigo" || h === "item" || h === "#" || h === "no.")) colId = c;
-    if (colNombre === -1 && (h.indexOf("nombre") !== -1 || h.indexOf("articulo") !== -1 || h.indexOf("producto") !== -1 || h.indexOf("descripcion del producto") !== -1 || h === "insumo")) colNombre = c;
-    if (colCategoria === -1 && (h.indexOf("categoria") !== -1 || h.indexOf("seccion") !== -1 || h.indexOf("tipo") !== -1)) colCategoria = c;
-    if (colSuplidor === -1 && (h.indexOf("suplidor") !== -1 || h.indexOf("proveedor") !== -1 || h.indexOf("origen") !== -1)) colSuplidor = c;
-    if (colUnidad === -1 && (h.indexOf("unidad") !== -1 || h.indexOf("medida") !== -1 || h.indexOf("presentacion") !== -1)) colUnidad = c;
-    if (colActual === -1 && (h.indexOf("actual") !== -1 || h.indexOf("restante") !== -1 || h.indexOf("existencia") !== -1 || h.indexOf("stock actual") !== -1 || h.indexOf("conteo") !== -1)) colActual = c;
-    if (colMin === -1 && (h.indexOf("minimo") !== -1 || h === "min" || h.indexOf("stock min") !== -1)) colMin = c;
-    if (colMax === -1 && (h.indexOf("maximo") !== -1 || h === "max" || h.indexOf("stock max") !== -1)) colMax = c;
-    if (colSugerido === -1 && (h.indexOf("sugerid") !== -1 || h.indexOf("a pedir") !== -1 || h.indexOf("pedido") !== -1 || h.indexOf("compra") !== -1)) colSugerido = c;
-    if (colDescripcion === -1 && (h === "descripcion" || h.indexOf("detalle") !== -1 || h.indexOf("nota") !== -1)) colDescripcion = c;
-    if (colVencimiento === -1 && (h.indexOf("vencimiento") !== -1 || h.indexOf("caducidad") !== -1 || h.indexOf("fecha") !== -1)) colVencimiento = c;
-    if (colFoto === -1 && (h.indexOf("foto") !== -1 || h.indexOf("imagen") !== -1 || h.indexOf("url") !== -1)) colFoto = c;
-  }
-
-  // Índices estándar por defecto si no se detectaron en encabezados
-  if (colId === -1) colId = 0;
-  if (colNombre === -1) colNombre = 1;
-  if (colCategoria === -1) colCategoria = 2;
-  if (colSuplidor === -1) colSuplidor = 3;
-  if (colUnidad === -1) colUnidad = 4;
-  if (colActual === -1) colActual = 5;
-  if (colMin === -1) colMin = 6;
-  if (colMax === -1) colMax = 7;
-  if (colSugerido === -1) colSugerido = 8;
-  if (colDescripcion === -1) colDescripcion = 9;
-  if (colVencimiento === -1) colVencimiento = 10;
-  if (colFoto === -1) colFoto = 11;
-
-  return {
-    id: colId,
-    nombre: colNombre,
-    categoria: colCategoria,
-    suplidor: colSuplidor,
-    unidad: colUnidad,
-    actual: colActual,
-    min: colMin,
-    max: colMax,
-    sugerido: colSugerido,
-    descripcion: colDescripcion,
-    vencimiento: colVencimiento,
-    foto: colFoto
-  };
-}
-
-/**
- * Envía la notificación por correo de un ajuste de stock o una eliminación.
- * Se desactiva automáticamente si SAHOCO_EMAIL_NOTIFICACIONES está vacío.
- */
-function sahocoNotificarCambio_(detalle) {
-  try {
-    if (!SAHOCO_EMAIL_NOTIFICACIONES || SAHOCO_EMAIL_NOTIFICACIONES.length === 0) {
-      return;
-    }
-    const esPrioritario = detalle.esPrioritario === true;
-    const asunto =
-      (esPrioritario ? "🚨 [MÁXIMA PRIORIDAD - INSUMO CLAVE] " : "") +
-      "📦 SAHOCO | " + (detalle.tipo || "Movimiento") + ": " + (detalle.producto || "Insumo");
-    const cuerpo = [
-      esPrioritario ? "🚨 INSUMO CLAVE DE COCINA - MÁXIMA PRIORIDAD" : "",
-      esPrioritario ? "--------------------------------------" : "",
-      "MOVIMIENTO REGISTRADO EN SAHOCO",
-      "--------------------------------------",
-      "Tipo: " + (detalle.tipo || ""),
-      "Producto: " + (detalle.producto || ""),
-      esPrioritario ? "Prioridad: ALTA (insumo indispensable)" : "",
-      (detalle.stockAnterior !== undefined && detalle.stockAnterior !== "" && detalle.stockAnterior !== null)
-        ? "Stock anterior: " + detalle.stockAnterior : "",
-      (detalle.stockNuevo !== undefined && detalle.stockNuevo !== "" && detalle.stockNuevo !== null)
-        ? "Stock nuevo: " + detalle.stockNuevo : "",
-      (detalle.sugerido !== undefined && detalle.sugerido !== null) ? "Cantidad sugerida: " + detalle.sugerido : "",
-      "Realizado por: " + (detalle.usuario || ""),
-      "Fecha: " + new Date().toLocaleString("es-DO")
-    ].filter(function (linea) { return linea !== ""; }).join("\n");
-
-    MailApp.sendEmail({
-      to: SAHOCO_EMAIL_NOTIFICACIONES.join(","),
-      subject: asunto,
-      body: cuerpo
-    });
-  } catch (e) {
-    // Un fallo de correo nunca debe romper la operación principal
-  }
-}
-
-/**
- * Registra un comiso en la pestaña "Comisos" (si no existe, la crea).
- * Nunca interrumpe la operación principal si falla.
- */
-function sahocoRegistrarComiso_(ss, detalle) {
-  try {
-    let sheetC = ss.getSheetByName(SAHOCO_SHEET_COMISOS);
-    if (!sheetC) {
-      sheetC = ss.insertSheet(SAHOCO_SHEET_COMISOS);
-      sheetC.appendRow([
-        "Fecha", "Producto", "Cantidad", "Unidad", "Motivo",
-        "Fecha Vencimiento", "Notas", "Usuario", "Stock Anterior", "Stock Nuevo"
-      ]);
-    }
-    sheetC.appendRow([
-      new Date(),
-      detalle.producto || "",
-      detalle.cantidad || 0,
-      detalle.unidad || "",
-      detalle.motivo || "",
-      detalle.fechaVencimiento || "",
-      detalle.notas || "",
-      detalle.usuario || "",
-      detalle.stockAnterior || 0,
-      detalle.stockNuevo || 0
-    ]);
-  } catch (e) {
-    // Silencioso: la app no debe fallar si la hoja de comisos no está disponible
-  }
-}
-
-/**
- * Envía la notificación por correo de un comiso/merma.
- * Se desactiva automáticamente si SAHOCO_EMAIL_NOTIFICACIONES está vacío.
- * Función exclusiva de esta expansión para no colisionar con Correos.gs existente.
- */
-function sahocoNotificarComiso_(detalle) {
-  try {
-    if (!SAHOCO_EMAIL_NOTIFICACIONES || SAHOCO_EMAIL_NOTIFICACIONES.length === 0) {
-      return;
-    }
-    const asunto = "🚨 SAHOCO | Comiso/Merma registrado: " + (detalle.producto || "Insumo");
-    const cuerpo = [
-      "COMISO / MERMA REGISTRADO EN SAHOCO",
-      "--------------------------------------",
-      "Producto: " + (detalle.producto || ""),
-      "Cantidad retirada: " + (detalle.cantidad || 0) + " " + (detalle.unidad || ""),
-      "Motivo: " + (detalle.motivo || ""),
-      "Fecha de vencimiento: " + (detalle.fechaVencimiento || "No aplica"),
-      "Notas: " + (detalle.notas || "Sin observaciones"),
-      "Stock anterior: " + (detalle.stockAnterior || 0),
-      "Stock nuevo: " + (detalle.stockNuevo || 0),
-      "Registrado por: " + (detalle.usuario || ""),
-      "Fecha del registro: " + new Date().toLocaleString("es-DO")
-    ].join("\n");
-
-    MailApp.sendEmail({
-      to: SAHOCO_EMAIL_NOTIFICACIONES.join(","),
-      subject: asunto,
-      body: cuerpo
-    });
-  } catch (e) {
-    // Si el correo falla, el comiso ya quedó registrado: no romper la respuesta
-  }
-}
-
-/**
- * Notificación por correo de un LOTE de cambios de stock (batching de la app).
- * Se envía UN solo correo con todos los insumos modificados en la jornada.
- * Si el módulo de correos HTML (Correos.gs) está instalado, usa su plantilla;
- * de lo contrario envía texto plano. Se desactiva si SAHOCO_EMAIL_NOTIFICACIONES
- * está vacío.
- */
-function sahocoNotificarLote_(detalle) {
-  try {
-    if (!SAHOCO_EMAIL_NOTIFICACIONES || SAHOCO_EMAIL_NOTIFICACIONES.length === 0) {
-      return;
-    }
-    const d = detalle || {};
-    const cambios = Array.isArray(d.cambios) ? d.cambios : [];
-    if (cambios.length === 0) {
-      return;
-    }
-
-    const visibles = cambios.slice(0, 50);
-    const ocultos = cambios.length - visibles.length;
-    const hayPrioridad = cambios.some(function (c) { return c.esPrioritario === true; });
-    const asunto = (hayPrioridad ? "🚨 [MÁXIMA PRIORIDAD - INSUMO CLAVE] " : "") +
-      "📦 SAHOCO | " + cambios.length + " cambios de stock sincronizados (" + (d.usuario || "varios") + ")";
-
-    const lineasTexto = cambios.map(function (c) {
-      return (c.esPrioritario ? "🔥 " : "• ") + (c.nombre || "Insumo") + ": " + (c.anterior || 0) + " → " + (c.nuevo || 0) +
-        (c.usuario ? " (" + c.usuario + ")" : "");
-    });
-
-    // ¿Está instalado el módulo de correos HTML (Correos.gs)?
-    const hayPlantilla =
-      typeof sahocoCorreoPlantilla_ === "function" &&
-      typeof sahocoCorreoEnviar_ === "function" &&
-      typeof sahocoCorreoFila_ === "function" &&
-      typeof sahocoCorreoPildora_ === "function" &&
-      typeof sahocoCorreoNum_ === "function" &&
-      typeof sahocoCorreoEsc_ === "function";
-
-    if (hayPlantilla) {
-      const hayAgotado = cambios.some(function (c) { return Number(c.nuevo) <= 0; });
-      const filas = visibles.map(function (c) {
-        const agotado = Number(c.nuevo) <= 0;
-        const color = agotado ? "#f87171" : (c.esPrioritario ? "#f97316" : "#34d399");
-        const valor = (c.esPrioritario ? "🔥 " : "") + '<b style="color:' + color + ';">' +
-          sahocoCorreoEsc_(sahocoCorreoNum_(c.anterior || 0)) + " → " +
-          sahocoCorreoEsc_(sahocoCorreoNum_(c.nuevo || 0)) + "</b>";
-        return sahocoCorreoFila_(c.nombre || "Insumo", "", { html: valor });
-      }).join("");
-
-      const nombresClaveArr = cambios
-        .filter(function (c) { return c.esPrioritario === true; })
-        .map(function (c) { return c.nombre || "Insumo"; });
-      const nombresClave = nombresClaveArr.slice(0, 8).join(", ") +
-        (nombresClaveArr.length > 8 ? " y " + (nombresClaveArr.length - 8) + " más" : "");
-      const nota = (hayPrioridad && typeof sahocoCorreoNota_ === "function")
-        ? sahocoCorreoNota_("Insumos clave afectados", nombresClave, "#f87171")
-        : "";
-
-      const html = sahocoCorreoPlantilla_({
-        acento: hayAgotado ? "#f87171" : "#f97316",
-        pildora: sahocoCorreoPildora_("Lote de " + cambios.length, "#f97316") +
-          (hayPrioridad ? " " + sahocoCorreoPildora_("🔥 Prioridad Alta", "#f87171") : ""),
-        resumen: (hayPrioridad ? "INSUMOS CLAVE. " : "") + cambios.length + " insumos actualizados de una sola vez",
-        titulo: hayPrioridad ? "Cambios de stock (con insumos clave)" : "Cambios de stock sincronizados",
-        subtitulo: d.detalle || ("Registrados por " + (d.usuario || "varios usuarios")),
-        filas: filas + (ocultos > 0
-          ? sahocoCorreoFila_("Y " + ocultos + " insumo(s) más", "…")
-          : ""),
-        nota: nota
-      });
-
-      const texto = [
-        "SAHOCO · INVENTARIO",
-        "--------------------------------------",
-        "LOTE DE CAMBIOS DE STOCK (" + cambios.length + ")",
-        ""
-      ].concat(lineasTexto).concat([
-        "",
-        "Detalle: " + (d.detalle || "Lote de jornada"),
-        "Enviado por: " + (d.usuario || "Usuario Sahoco"),
-        "Fecha: " + new Date().toLocaleString("es-DO")
-      ]).join("\n");
-
-      sahocoCorreoEnviar_(asunto, html, texto);
-      return;
-    }
-
-    // Respaldo en texto plano (sin Correos.gs instalado)
-    const cuerpo = [
-      "SAHOCO | LOTE DE CAMBIOS DE STOCK (" + cambios.length + ")",
-      "--------------------------------------"
-    ].concat(lineasTexto).concat([
-      "",
-      "Detalle: " + (d.detalle || "Lote de jornada"),
-      "Enviado por: " + (d.usuario || "Usuario Sahoco"),
-      "Fecha: " + new Date().toLocaleString("es-DO")
-    ]).join("\n");
-
-    MailApp.sendEmail({
-      to: SAHOCO_EMAIL_NOTIFICACIONES.join(","),
-      subject: asunto,
-      body: cuerpo
-    });
-  } catch (e) {
-    // Un fallo de correo nunca debe romper la operación principal
-  }
-}
-
-/**
- * Obtiene (o crea) la hoja de recetas.
- */
-function sahocoGetRecipesSheet_(ss) {
-  let sheetR = ss.getSheetByName(SAHOCO_SHEET_RECETAS);
-  if (!sheetR) {
-    sheetR = ss.insertSheet(SAHOCO_SHEET_RECETAS);
-    sheetR.appendRow(["ID", "Nombre", "Categoria", "JSON", "CreadoPor", "FechaActualizacion"]);
-  }
-  return sheetR;
-}
-
-/**
- * Manejador principal unificado para peticiones GET y POST
- */
 function handleRequest(e) {
-  try {
-    let action = "get";
-    let postData = null;
+  var ss = getSpreadsheet();
+  var sheet = ss.getSheetByName("Inv.") || ss.getSheets()[0];
+  var action = (e && e.parameter && e.parameter.action) ? e.parameter.action : "get";
+  var output = ContentService.createTextOutput().setMimeType(ContentService.MimeType.JSON);
 
-    if (e && e.parameter && e.parameter.action) {
-      action = e.parameter.action;
+  // 1. OBTENER TODO EL INVENTARIO (GET)
+  if (action === "get" || (e && !e.postData && action === "get")) {
+    var rows = sheet.getDataRange().getValues();
+    if (rows.length < 2) {
+      return output.setContent(JSON.stringify({ status: "error", message: "Hoja vacía" }));
     }
 
-    if (e && e.postData && e.postData.contents) {
-      try {
-        postData = JSON.parse(e.postData.contents);
-        if (postData && postData.action) {
-          action = postData.action;
-        }
-      } catch (parseErr) {
-        // En caso de que no sea JSON válido en POST
-      }
+    var data = [];
+    for (var i = 2; i < rows.length; i++) {
+      var row = rows[i];
+      if (!row[1] || String(row[1]).trim() === "") continue;
+
+      var item = {
+        rowIndex: i + 1,
+        no: row[0] || (i - 1),
+        articulo: String(row[1]).trim(),
+        suplidor: row[2] ? String(row[2]).trim() : "General",
+        unidad: row[3] ? String(row[3]).trim() : "UND",
+        min: parseFloat(row[4]) || 0,
+        max: parseFloat(row[5]) || 0,
+        actual: isNaN(parseFloat(row[6])) ? 0 : parseFloat(row[6]),
+        restante: parseFloat(row[7]) || 0,
+        sugerido: row[8] !== "" && row[8] !== undefined ? parseFloat(row[8]) : Math.max(0, ((parseFloat(row[5]) || 0) - (parseFloat(row[6]) || 0))),
+        vencimiento: row[9] ? String(row[9]) : "N/A",
+        descripcion: row[10] || "",
+        imagen: row[11] || ""
+      };
+
+      data.push(item);
     }
 
-    const ss = getTargetSpreadsheet();
-    const sheet = getInventorySheet(ss);
+    return output.setContent(JSON.stringify({
+      status: "success",
+      totalItems: data.length,
+      data: data
+    }));
+  }
 
-    // =========================================================================
-    // ACCIÓN: OBTENER TODOS LOS PRODUCTOS (action === "get" o "get_inventory")
-    // =========================================================================
-    if (action === "get" || action === "get_inventory" || action === "test" || action === "read") {
-      const lastRow = sheet.getLastRow();
-      const lastCol = Math.max(sheet.getLastColumn(), 14);
+  // 2. ACTUALIZACIÓN DE PRODUCTO / FICHA EDITABLE / COMISO (UPDATE - BLOQUE A)
+  if (action === "update" && e.postData) {
+    try {
+      var req = JSON.parse(e.postData.contents);
+      var rIndex = parseInt(req.rowIndex);
+      var nActual = parseFloat(req.actual);
+      var usuario = req.usuario || "SAHOCO";
+      var sugCustom = req.sugerido !== undefined ? parseFloat(req.sugerido) : null;
+      var esPrioritario = req.esPrioritario === true || req.nivelPrioridad === "Alta";
 
-      // Si no hay datos suficientes para llegar a la fila 3
-      if (lastRow < 3) {
-        return createJsonResponse({
-          status: "success",
-          count: 0,
-          total: 0,
-          totalItems: 0,
-          sheet: sheet.getName(),
-          data: []
-        });
-      }
+      if (rIndex && !isNaN(nActual)) {
+        var nArt = sheet.getRange(rIndex, 2).getValue();
+        var sAnt = sheet.getRange(rIndex, 7).getValue();
+        var minV = parseFloat(sheet.getRange(rIndex, 5).getValue()) || 0;
 
-      // 1. Detección dinámica de encabezados (lógica compartida con update/bulk_update)
-      const cols = detectColumnMap(sheet, lastCol);
-      const colId = cols.id;
-      const colNombre = cols.nombre;
-      const colCategoria = cols.categoria;
-      const colSuplidor = cols.suplidor;
-      const colUnidad = cols.unidad;
-      const colActual = cols.actual;
-      const colMin = cols.min;
-      const colMax = cols.max;
-      const colSugerido = cols.sugerido;
-      const colDescripcion = cols.descripcion;
-      const colVencimiento = cols.vencimiento;
-      const colFoto = cols.foto;
-
-      // 2. Lectura Completa del Rango: Desde Fila 3 hasta sheet.getLastRow()
-      const startRow = 3;
-      const numRows = lastRow - startRow + 1;
-      const allRows = sheet.getRange(startRow, 1, numRows, lastCol).getValues();
-
-      const items = [];
-
-      // 3. Recorrido sin retorno prematuro: NINGÚN producto se descarta
-      for (let i = 0; i < allRows.length; i++) {
-        const row = allRows[i];
-        const currentRowNumber = startRow + i;
-
-        // Comprobación de fila completamente vacía (solo omitir si absolutamente todas las celdas están vacías)
-        let isCompletelyEmpty = true;
-        for (let k = 0; k < row.length; k++) {
-          if (row[k] !== "" && row[k] !== null && row[k] !== undefined) {
-            isCompletelyEmpty = false;
-            break;
-          }
-        }
-        if (isCompletelyEmpty) {
-          continue; // No romper el bucle con break, solo continuar con la siguiente fila
+        sheet.getRange(rIndex, 7).setValue(nActual);
+        if (sugCustom !== null && !isNaN(sugCustom)) {
+          sheet.getRange(rIndex, 9).setValue(sugCustom);
         }
 
-        // Extracción de datos
-        let rawId = row[colId];
-        let rawNombre = row[colNombre];
-
-        // Si la columna Nombre está vacía, revisar si el nombre está en la columna ID o viceversa
-        if (!rawNombre && rawId && isNaN(Number(rawId))) {
-          rawNombre = rawId;
-          rawId = "PRD-" + currentRowNumber;
-        }
-
-        const nombre = rawNombre ? String(rawNombre).trim() : ("Insumo Fila " + currentRowNumber);
-        const id = rawId ? String(rawId).trim() : ("PRD-" + currentRowNumber);
-
-        // Extracción numérica segura (valores por defecto 0 si están vacíos, NaN o null)
-        const parseStockValue = function(val, defaultVal) {
-          if (val === "" || val === null || val === undefined) return defaultVal;
-          const cleaned = String(val).replace(/,/g, ".").replace(/[^0-9.-]/g, "").trim();
-          const num = Number(cleaned);
-          return isNaN(num) ? defaultVal : num;
-        };
-
-        const stockActual = parseStockValue(row[colActual], 0);
-        const stockMinimo = parseStockValue(row[colMin], 0);
-        const stockMaximo = parseStockValue(row[colMax], 0);
-        let cantidadSugerida = parseStockValue(row[colSugerido], 0);
-
-        if (cantidadSugerida === 0 && stockMaximo > stockActual) {
-          cantidadSugerida = Math.max(0, stockMaximo - stockActual);
-        }
-
-        const suplidor = row[colSuplidor] ? String(row[colSuplidor]).trim() : "Proveedor General";
-        const unidad = row[colUnidad] ? String(row[colUnidad]).trim() : "Unidad";
-        const categoria = autoClassify(nombre, row[colCategoria]);
-        const descripcion = row[colDescripcion] ? String(row[colDescripcion]).trim() : "";
-        const fechaVencimiento = row[colVencimiento] ? String(row[colVencimiento]).trim() : "";
-        const foto = row[colFoto] ? String(row[colFoto]).trim() : "";
-
-        items.push({
-          id: id,
-          rowIndex: currentRowNumber,
-          nombre: nombre,
-          categoria: categoria,
-          suplidor: suplidor,
-          unidad: unidad,
-          stockActual: stockActual,
-          stockMinimo: stockMinimo,
-          stockMaximo: stockMaximo,
-          cantidadSugerida: cantidadSugerida,
-          descripcion: descripcion,
-          fechaVencimiento: fechaVencimiento,
-          foto: foto,
-          ultimaModificacion: new Date().toISOString(),
-          modificadoPor: "Google Sheets"
-        });
-      }
-
-      return createJsonResponse({
-        status: "success",
-        count: items.length,
-        total: items.length,
-        totalItems: items.length,
-        sheet: sheet.getName(),
-        startRow: startRow,
-        lastRow: lastRow,
-        data: items
-      });
-    }
-
-    // =========================================================================
-    // ACCIÓN: ACTUALIZAR EXISTENCIAS (POST { action: "update", rowIndex, actual })
-    // Compatible con el formato anterior + campos opcionales de ficha (foto, mín/máx, etc.)
-    // y detalles de comiso (auditoría + correo).
-    // =========================================================================
-    if (action === "update" && postData) {
-      const rowIndex = Number(postData.rowIndex);
-      const newActual = Number(postData.actual);
-      const newSugerido = postData.sugerido !== undefined ? Number(postData.sugerido) : null;
-      const usuario = postData.usuario || "Usuario Sahoco";
-      const nombre = postData.nombre || "Insumo";
-      const lastCol = Math.max(sheet.getLastColumn(), 14);
-      const cols = detectColumnMap(sheet, lastCol);
-      let stockAnterior = "";
-
-      if (rowIndex >= 3 && rowIndex <= sheet.getLastRow()) {
-        // Stock actual (columna detectada, respaldo estándar: columna 6)
-        stockAnterior = sheet.getRange(rowIndex, cols.actual + 1).getValue();
-        if (!isNaN(newActual)) {
-          sheet.getRange(rowIndex, cols.actual + 1).setValue(newActual);
-        }
-
-        // Cantidad sugerida (columna detectada, respaldo estándar: columna 9)
-        if (newSugerido !== null && !isNaN(newSugerido)) {
-          sheet.getRange(rowIndex, cols.sugerido + 1).setValue(newSugerido);
-        }
-
-        // Campos opcionales enviados por la ficha de edición rápida
-        const optionalFields = [
-          ["nombre", cols.nombre],
-          ["suplidor", cols.suplidor],
-          ["categoria", cols.categoria],
-          ["unidad", cols.unidad],
-          ["stockMinimo", cols.min],
-          ["stockMaximo", cols.max],
-          ["descripcion", cols.descripcion],
-          ["fechaVencimiento", cols.vencimiento],
-          ["foto", cols.foto]
+        // Campos de la ficha editable (solo se actualizan si se modificaron en el formulario)
+        var camposFicha = [
+          ["nombre", 2],
+          ["suplidor", 3],
+          ["unidad", 4],
+          ["stockMinimo", 5],
+          ["stockMaximo", 6],
+          ["fechaVencimiento", 10],
+          ["descripcion", 11],
+          ["foto", 12]
         ];
-        for (let f = 0; f < optionalFields.length; f++) {
-          const key = optionalFields[f][0];
-          const colIndex = optionalFields[f][1];
-          if (postData[key] !== undefined && postData[key] !== null && colIndex >= 0) {
-            sheet.getRange(rowIndex, colIndex + 1).setValue(postData[key]);
+
+        for (var f = 0; f < camposFicha.length; f++) {
+          if (req[camposFicha[f][0]] !== undefined && req[camposFicha[f][0]] !== null) {
+            sheet.getRange(rIndex, camposFicha[f][1]).setValue(req[camposFicha[f][0]]);
           }
         }
 
-        // Columnas 13 y 14: Fecha y Usuario (si existen)
-        if (sheet.getLastColumn() >= 13) {
-          sheet.getRange(rowIndex, 13).setValue(new Date().toISOString());
+        if (req.comiso) {
+          var c = req.comiso;
+          enviarCorreoComiso(usuario, nArt, c.cantidad || 0, c.motivo || "Otro", c.fechaVencimiento || "", esPrioritario);
+        } else {
+          enviarCorreoAuditoria(usuario, nArt, sAnt, nActual, minV, sugCustom, esPrioritario);
         }
-        if (sheet.getLastColumn() >= 14) {
-          sheet.getRange(rowIndex, 14).setValue(usuario);
-        }
-      }
 
-      // ── Comiso / Merma: auditoría dedicada + notificación por correo ──
-      let esComiso = false;
-      let mensajeComiso = "";
-      if (postData.comiso) {
-        try {
-          const c = postData.comiso;
-          const detalleComiso = {
-            producto: nombre,
-            cantidad: Number(c.cantidad) || 0,
-            unidad: c.unidad || "",
-            motivo: c.motivo || "Otro",
-            fechaVencimiento: c.fechaVencimiento || "",
-            notas: c.notas || "",
-            usuario: usuario,
-            stockAnterior: c.stockAnterior !== undefined ? Number(c.stockAnterior) : "",
-            stockNuevo: c.stockNuevo !== undefined ? Number(c.stockNuevo) : newActual,
-            esPrioritario: postData.esPrioritario === true
-          };
-          logAudit(ss, "COMISO", `Comiso/Merma de "${nombre}": -${detalleComiso.cantidad} ${detalleComiso.unidad} | Motivo: ${detalleComiso.motivo} | Venció: ${detalleComiso.fechaVencimiento || "N/A"} | Notas: ${detalleComiso.notas || "Sin observaciones"}`, usuario);
-          sahocoRegistrarComiso_(ss, detalleComiso);
-          sahocoNotificarComiso_(detalleComiso);
-          esComiso = true;
-          mensajeComiso = `Comiso de "${nombre}" registrado: -${detalleComiso.cantidad} ${detalleComiso.unidad} (${detalleComiso.motivo})`;
-        } catch (comisoErr) {
-          // El stock ya fue actualizado: un fallo de auditoría/correo no debe romper la respuesta
-        }
+        return output.setContent(JSON.stringify({
+          status: "success",
+          message: "Stock actualizado",
+          rowIndex: rIndex,
+          nuevoStock: nActual
+        }));
       }
-
-      if (!esComiso) {
-        logAudit(ss, "ACTUALIZACIÓN", `Stock de "${nombre}" ajustado a ${newActual} por ${usuario}`, usuario);
-        sahocoNotificarCambio_({
-          tipo: "Ajuste de stock",
-          producto: nombre,
-          stockAnterior: stockAnterior,
-          stockNuevo: newActual,
-          sugerido: newSugerido,
-          usuario: usuario,
-          esPrioritario: postData.esPrioritario === true,
-          nivelPrioridad: postData.nivelPrioridad || ""
-        });
-      }
-
-      return createJsonResponse({
-        status: "success",
-        message: esComiso ? mensajeComiso : `Stock de "${nombre}" actualizado a ${newActual}`,
-        rowIndex: rowIndex,
-        actual: newActual
-      });
+    } catch (err) {
+      return output.setContent(JSON.stringify({ status: "error", message: err.toString() }));
     }
+  }
 
-    // =========================================================================
-    // ACCIÓN: DESCUENTO EN LOTE / PREPARACIÓN DE PLATOS (POST { action: "bulk_update", changes: [...] })
-    // Cada insumo se procesa de forma aislada: si uno falla, los demás se mantienen.
-    // =========================================================================
-    if (action === "bulk_update" && postData && Array.isArray(postData.changes)) {
-      const usuario = postData.usuario || "Usuario Sahoco";
-      const detalle = postData.detalle || "Actualización en lote";
-      const lastCol = Math.max(sheet.getLastColumn(), 14);
-      const cols = detectColumnMap(sheet, lastCol);
-      const results = [];
-      const cambiosAplicados = [];
-      let applied = 0;
-      const lastRow = sheet.getLastRow();
+  // 3. AGREGAR NUEVO INSUMO (ADD - BLOQUE B)
+  if (action === "add" && e.postData) {
+    try {
+      var reqAdd = JSON.parse(e.postData.contents);
+      var it = reqAdd.item;
+      if (it) {
+        var filaNueva = sheet.getLastRow() + 1;
+        var actualNuevo = Number(it.stockActual) || 0;
+        var minNuevo = Number(it.stockMinimo) || 0;
+        var maxNuevo = Number(it.stockMaximo) || 0;
+        var sugNuevo = Number(it.cantidadSugerida) || 0;
 
-      for (let i = 0; i < postData.changes.length; i++) {
-        const change = postData.changes[i];
-        try {
-          const rowIndex = Number(change.rowIndex);
-          const newActual = Number(change.actual);
-          if (rowIndex < 3 || rowIndex > lastRow || isNaN(newActual)) {
-            results.push({ rowIndex: rowIndex, nombre: change.nombre || "", status: "skipped" });
-            continue;
-          }
-          const stockAnteriorFila = sheet.getRange(rowIndex, cols.actual + 1).getValue();
-          sheet.getRange(rowIndex, cols.actual + 1).setValue(newActual);
-          if (change.sugerido !== undefined && !isNaN(Number(change.sugerido))) {
-            sheet.getRange(rowIndex, cols.sugerido + 1).setValue(Number(change.sugerido));
-          }
-          if (sheet.getLastColumn() >= 13) {
-            sheet.getRange(rowIndex, 13).setValue(new Date().toISOString());
-          }
-          if (sheet.getLastColumn() >= 14) {
-            sheet.getRange(rowIndex, 14).setValue(change.usuario || usuario);
-          }
-          applied++;
-          cambiosAplicados.push({
-            nombre: change.nombre || "Insumo",
-            anterior: stockAnteriorFila,
-            nuevo: newActual,
-            usuario: change.usuario || usuario,
-            esPrioritario: change.esPrioritario === true
-          });
-          results.push({ rowIndex: rowIndex, nombre: change.nombre || "", status: "success" });
-        } catch (rowErr) {
-          results.push({ rowIndex: change.rowIndex, nombre: change.nombre || "", status: "error", message: String(rowErr) });
+        if (sugNuevo === 0 && maxNuevo > actualNuevo) {
+          sugNuevo = Math.max(0, maxNuevo - actualNuevo);
         }
+
+        sheet.getRange(filaNueva, 1, 1, 12).setValues([[
+          filaNueva - 2,
+          it.nombre || "Nuevo Insumo",
+          it.suplidor || "General",
+          it.unidad || "UND",
+          minNuevo,
+          maxNuevo,
+          actualNuevo,
+          "",
+          sugNuevo,
+          it.fechaVencimiento || "",
+          it.descripcion || "",
+          it.foto || ""
+        ]]);
+
+        return output.setContent(JSON.stringify({
+          status: "success",
+          message: 'Producto "' + (it.nombre || "Nuevo Insumo") + '" agregado con éxito'
+        }));
       }
-
-      logAudit(ss, "PREPARACION", `${detalle} | ${applied} de ${postData.changes.length} insumos descontados`, usuario);
-
-      if (postData.notificar === true && cambiosAplicados.length > 0) {
-        sahocoNotificarLote_({
-          usuario: usuario,
-          detalle: detalle,
-          cambios: cambiosAplicados
-        });
-      }
-
-      return createJsonResponse({
-        status: applied > 0 ? "success" : "error",
-        message: applied > 0
-          ? `${applied} de ${postData.changes.length} insumos sincronizados`
-          : "No se pudo sincronizar ningún insumo",
-        applied: applied,
-        results: results
-      });
+    } catch (errAdd) {
+      return output.setContent(JSON.stringify({ status: "error", message: errAdd.toString() }));
     }
+  }
 
-    // =========================================================================
-    // ACCIÓN: AGREGAR PRODUCTO (POST { action: "add", item })
-    // =========================================================================
-    if (action === "add" && postData && postData.item) {
-      const item = postData.item;
-      const usuario = postData.usuario || "Usuario Sahoco";
-      const existingCols = sheet.getLastColumn();
-      const lastCol = Math.max(existingCols, 12);
-      const cols = detectColumnMap(sheet, lastCol);
-      const newRowIndex = sheet.getLastRow() + 1;
-      const rowValues = new Array(lastCol).fill("");
-
-      // Escritura por columnas detectadas: compatible con hojas sin columna "Categoría"
-      // (en ese caso la categoría se calcula automáticamente en la app).
-      rowValues[cols.id] = newRowIndex - 2;
-      rowValues[cols.nombre] = item.nombre || "Nuevo Insumo";
-      rowValues[cols.suplidor] = item.suplidor || "Proveedor General";
-      rowValues[cols.unidad] = item.unidad || "Unidad";
-      const stockActual = Number(item.stockActual) || 0;
-      const stockMin = Number(item.stockMinimo) || 0;
-      const stockMax = Number(item.stockMaximo) || 0;
-      let sugerido = Number(item.cantidadSugerida) || 0;
-      if (sugerido === 0 && stockMax > stockActual) {
-        sugerido = Math.max(0, stockMax - stockActual);
-      }
-      rowValues[cols.actual] = stockActual;
-      rowValues[cols.min] = stockMin;
-      rowValues[cols.max] = stockMax;
-      rowValues[cols.sugerido] = sugerido;
-      rowValues[cols.descripcion] = item.descripcion || "";
-      rowValues[cols.vencimiento] = item.fechaVencimiento || "";
-      rowValues[cols.foto] = item.foto || "";
-
-      // Columnas 13/14 (Fecha y Usuario) solo si ya existen en la hoja
-      if (existingCols >= 13) rowValues[12] = new Date().toISOString();
-      if (existingCols >= 14) rowValues[13] = usuario;
-
-      sheet.getRange(newRowIndex, 1, 1, lastCol).setValues([rowValues]);
-
-      logAudit(ss, "NUEVO_PRODUCTO", `Nuevo producto añadido: ${item.nombre}`, usuario);
-
-      return createJsonResponse({
-        status: "success",
-        message: `Producto "${item.nombre}" agregado con éxito`,
-        total: sheet.getLastRow() - 2
-      });
-    }
-
-    // =========================================================================
-    // ACCIÓN: ELIMINAR PRODUCTO (POST { action: "delete", rowIndex, id })
-    // =========================================================================
-    if (action === "delete" && postData) {
-      const rowIndex = Number(postData.rowIndex);
-      const id = String(postData.id || "");
-      const nombre = postData.nombre || "Insumo";
-      const usuario = postData.usuario || "Usuario Sahoco";
-
-      let deleted = false;
-      if (id) {
-        const lastRow = sheet.getLastRow();
-        const ids = sheet.getRange(3, 1, Math.max(1, lastRow - 2), 1).getValues();
-        for (let r = 0; r < ids.length; r++) {
-          if (String(ids[r][0]).trim() === id) {
-            sheet.deleteRow(3 + r);
-            deleted = true;
-            break;
-          }
-        }
-      }
-
-      if (!deleted && rowIndex >= 3 && rowIndex <= sheet.getLastRow()) {
-        sheet.deleteRow(rowIndex);
-        deleted = true;
-      }
-
-      logAudit(ss, "ELIMINACION", `Insumo "${nombre}" eliminado por ${usuario}`, usuario);
-
-      if (deleted) {
-        sahocoNotificarCambio_({
-          tipo: "Producto eliminado",
-          producto: nombre,
-          usuario: usuario
-        });
-      }
-
-      return createJsonResponse({
-        status: "success",
-        message: `Insumo "${nombre}" eliminado correctamente`,
-        deleted: deleted
-      });
-    }
-
-    // =========================================================================
-    // ACCIÓN: OBTENER RECETAS (action === "get_recipes")
-    // =========================================================================
-    if (action === "get_recipes") {
-      const sheetR = sahocoGetRecipesSheet_(ss);
-      const lastRowR = sheetR.getLastRow();
-      const recetas = [];
+  // 4. OBTENER RECETAS (GET RECIPES - BLOQUE B)
+  if (action === "get_recipes") {
+    try {
+      var hojaR = sahocoRecetasSheet_(ss);
+      var lastRowR = hojaR.getLastRow();
+      var recetas = [];
 
       if (lastRowR >= 2) {
-        const rows = sheetR.getRange(2, 1, lastRowR - 1, 6).getValues();
-        for (let i = 0; i < rows.length; i++) {
-          const jsonCell = String(rows[i][3] || "").trim();
-          if (jsonCell) {
+        var filasR = hojaR.getRange(2, 1, lastRowR - 1, 6).getValues();
+        for (var r = 0; r < filasR.length; r++) {
+          var celdaJson = String(filasR[r][3] || "").trim();
+          if (celdaJson) {
             try {
-              recetas.push(JSON.parse(jsonCell));
+              recetas.push(JSON.parse(celdaJson));
               continue;
-            } catch (parseErr) {
-              // JSON dañado: se reconstruye desde las columnas visibles
-            }
+            } catch (eJson) {}
           }
-          const nombre = String(rows[i][1] || "").trim();
-          if (nombre) {
+          var nombreR = String(filasR[r][1] || "").trim();
+          if (nombreR) {
             recetas.push({
-              id: String(rows[i][0] || ""),
-              nombre: nombre,
-              categoria: String(rows[i][2] || "Otros"),
+              id: String(filasR[r][0] || ""),
+              nombre: nombreR,
+              categoria: String(filasR[r][2] || "Otros"),
               ingredientes: []
             });
           }
         }
       }
 
-      return createJsonResponse({
-        status: "success",
-        count: recetas.length,
-        sheet: sheetR.getName(),
-        data: recetas
-      });
+      return output.setContent(JSON.stringify({ status: "success", count: recetas.length, data: recetas }));
+    } catch (errR) {
+      return output.setContent(JSON.stringify({ status: "error", message: errR.toString() }));
     }
+  }
 
-    // =========================================================================
-    // ACCIÓN: GUARDAR RECETA (POST { action: "save_recipe", recipe })
-    // =========================================================================
-    if (action === "save_recipe" && postData && postData.recipe) {
-      const recipe = postData.recipe;
-      const usuario = postData.usuario || "Usuario Sahoco";
-      const sheetR = sahocoGetRecipesSheet_(ss);
-      const id = String(recipe.id || "");
+  // 5. GUARDAR / ACTUALIZAR RECETA (SAVE RECIPE - BLOQUE B)
+  if (action === "save_recipe" && e.postData) {
+    try {
+      var reqRec = JSON.parse(e.postData.contents);
+      var receta = reqRec.recipe;
+      if (receta) {
+        var hojaG = sahocoRecetasSheet_(ss);
+        var idRec = String(receta.id || "");
+        var filaRec = [
+          idRec,
+          receta.nombre || "Receta",
+          receta.categoria || "Otros",
+          JSON.stringify(receta),
+          receta.creadoPor || reqRec.usuario || "SAHOCO",
+          new Date().toISOString()
+        ];
+        var actualizada = false;
+        var lastRowG = hojaG.getLastRow();
 
-      const rowData = [
-        id,
-        recipe.nombre || "Receta",
-        recipe.categoria || "Otros",
-        JSON.stringify(recipe),
-        recipe.creadoPor || usuario,
-        new Date().toISOString()
-      ];
+        if (lastRowG >= 2 && idRec) {
+          var idsG = hojaG.getRange(2, 1, lastRowG - 1, 1).getValues();
+          for (var g = 0; g < idsG.length; g++) {
+            if (String(idsG[g][0]).trim() === idRec) {
+              hojaG.getRange(2 + g, 1, 1, 6).setValues([filaRec]);
+              actualizada = true;
+              break;
+            }
+          }
+        }
 
-      let updated = false;
-      const lastRowR = sheetR.getLastRow();
-      if (lastRowR >= 2 && id) {
-        const ids = sheetR.getRange(2, 1, lastRowR - 1, 1).getValues();
-        for (let r = 0; r < ids.length; r++) {
-          if (String(ids[r][0]).trim() === id) {
-            sheetR.getRange(2 + r, 1, 1, 6).setValues([rowData]);
-            updated = true;
+        if (!actualizada) {
+          hojaG.appendRow(filaRec);
+        }
+
+        return output.setContent(JSON.stringify({
+          status: "success",
+          message: actualizada ? "Receta actualizada en Google Sheets" : "Receta creada en Google Sheets"
+        }));
+      }
+    } catch (errRec) {
+      return output.setContent(JSON.stringify({ status: "error", message: errRec.toString() }));
+    }
+  }
+
+  // 6. ELIMINAR RECETA (DELETE RECIPE - BLOQUE B)
+  if (action === "delete_recipe" && e.postData) {
+    try {
+      var reqDelRec = JSON.parse(e.postData.contents);
+      var idDelRec = String(reqDelRec.id || "");
+      var hojaD = sahocoRecetasSheet_(ss);
+      var borrada = false;
+      var lastRowD = hojaD.getLastRow();
+
+      if (lastRowD >= 2 && idDelRec) {
+        var idsD = hojaD.getRange(2, 1, lastRowD - 1, 1).getValues();
+        for (var d = 0; d < idsD.length; d++) {
+          if (String(idsD[d][0]).trim() === idDelRec) {
+            hojaD.deleteRow(2 + d);
+            borrada = true;
             break;
           }
         }
       }
-      if (!updated) {
-        sheetR.appendRow(rowData);
-      }
 
-      logAudit(ss, "RECETA", (updated ? "Receta actualizada: " : "Receta creada: ") + rowData[1], usuario);
-
-      return createJsonResponse({
+      return output.setContent(JSON.stringify({
         status: "success",
-        message: updated ? "Receta actualizada en Google Sheets" : "Receta creada en Google Sheets"
-      });
+        message: 'Receta "' + (reqDelRec.nombre || "Receta") + '" eliminada',
+        deleted: borrada
+      }));
+    } catch (errDelRec) {
+      return output.setContent(JSON.stringify({ status: "error", message: errDelRec.toString() }));
     }
+  }
 
-    // =========================================================================
-    // ACCIÓN: ELIMINAR RECETA (POST { action: "delete_recipe", id })
-    // =========================================================================
-    if (action === "delete_recipe" && postData) {
-      const id = String(postData.id || "");
-      const nombre = postData.nombre || "Receta";
-      const usuario = postData.usuario || "Usuario Sahoco";
-      const sheetR = sahocoGetRecipesSheet_(ss);
-      let deleted = false;
+  // 7. ACTUALIZACIÓN POR LOTE DE JORNADA (BULK UPDATE)
+  if (action === "bulk_update" && e.postData) {
+    try {
+      var lote = JSON.parse(e.postData.contents);
+      var usLote = lote.usuario || "SAHOCO";
+      var cambios = Array.isArray(lote.changes) ? lote.changes : [];
+      var lastRowLote = sheet.getLastRow();
+      var aplicados = [];
 
-      const lastRowR = sheetR.getLastRow();
-      if (lastRowR >= 2 && id) {
-        const ids = sheetR.getRange(2, 1, lastRowR - 1, 1).getValues();
-        for (let r = 0; r < ids.length; r++) {
-          if (String(ids[r][0]).trim() === id) {
-            sheetR.deleteRow(2 + r);
-            deleted = true;
-            break;
-          }
+      for (var k = 0; k < cambios.length; k++) {
+        var ch = cambios[k];
+        var filaLote = parseInt(ch.rowIndex);
+        var nuevoLote = parseFloat(ch.actual);
+
+        if (filaLote < 3 || filaLote > lastRowLote || isNaN(nuevoLote)) continue;
+
+        var antLote = sheet.getRange(filaLote, 7).getValue();
+        sheet.getRange(filaLote, 7).setValue(nuevoLote);
+
+        if (ch.sugerido !== undefined && !isNaN(parseFloat(ch.sugerido))) {
+          sheet.getRange(filaLote, 9).setValue(parseFloat(ch.sugerido));
         }
+
+        aplicados.push({
+          nombre: ch.nombre || sheet.getRange(filaLote, 2).getValue() || "Insumo",
+          anterior: antLote,
+          nuevo: nuevoLote,
+          esPrioritario: ch.esPrioritario === true || ch.nivelPrioridad === "Alta"
+        });
       }
 
-      logAudit(ss, "RECETA_ELIMINADA", `Receta eliminada: ${nombre}`, usuario);
+      if (lote.notificar === true && aplicados.length > 0 && typeof enviarCorreoLote === "function") {
+        enviarCorreoLote(usLote, lote.detalle || "Lote de cambios de jornada", aplicados);
+      }
 
-      return createJsonResponse({
-        status: "success",
-        message: `Receta "${nombre}" eliminada`,
-        deleted: deleted
-      });
+      return output.setContent(JSON.stringify({
+        status: aplicados.length > 0 ? "success" : "error",
+        message: aplicados.length > 0
+          ? aplicados.length + " de " + cambios.length + " insumos sincronizados en un solo lote"
+          : "No se pudo sincronizar ningún insumo",
+        applied: aplicados.length
+      }));
+    } catch (errLote) {
+      return output.setContent(JSON.stringify({ status: "error", message: errLote.toString() }));
     }
-
-    return createJsonResponse({
-      status: "error",
-      message: "Acción no reconocida: " + action
-    });
-
-  } catch (err) {
-    return createJsonResponse({
-      status: "error",
-      message: err.toString(),
-      stack: err.stack || ""
-    });
   }
-}
 
-/**
- * Entrada estándar GET de Google Apps Script
- */
-function doGet(e) {
-  return handleRequest(e);
-}
+  // 8. ELIMINACIÓN DE INSUMO (DELETE)
+  if (action === "delete" && e.postData) {
+    try {
+      var reqDel = JSON.parse(e.postData.contents);
+      var rowDel = parseInt(reqDel.rowIndex);
+      var usDel = reqDel.usuario || "SAHOCO";
 
-/**
- * Entrada estándar POST de Google Apps Script
- */
-function doPost(e) {
-  return handleRequest(e);
-}
+      if (rowDel && rowDel > 2) {
+        var nBorrado = sheet.getRange(rowDel, 2).getValue();
+        sheet.deleteRow(rowDel);
+        enviarCorreoEliminacion(usDel, nBorrado);
 
-/**
- * Helper para registrar en auditoría
- */
-function logAudit(ss, action, detail, usuario) {
-  try {
-    let sheetAud = ss.getSheetByName(SHEET_AUDITORIA);
-    if (!sheetAud) {
-      sheetAud = ss.insertSheet(SHEET_AUDITORIA);
-      sheetAud.appendRow(["Fecha / Hora", "Acción", "Detalle", "Usuario"]);
+        return output.setContent(JSON.stringify({
+          status: "success",
+          message: "Producto eliminado correctamente"
+        }));
+      }
+    } catch (err) {
+      return output.setContent(JSON.stringify({ status: "error", message: err.toString() }));
     }
-    sheetAud.appendRow([new Date(), action, detail, usuario]);
-  } catch(e) {
-    // Si falla la auditoría, no interrumpir la acción principal
   }
+
+  return output.setContent(JSON.stringify({ status: "error", message: "Acción no válida" }));
 }
 
-/**
- * Retorna salida JSON con cabeceras CORS correctas
- */
-function createJsonResponse(data) {
-  return ContentService.createTextOutput(JSON.stringify(data))
-    .setMimeType(ContentService.MimeType.JSON);
+// ====================================================================
+// FUNCIONES AUXILIARES FUERA DE HANDLE_REQUEST (BLOQUE C)
+// ====================================================================
+
+function sahocoRecetasSheet_(ss) {
+  var hoja = ss.getSheetByName("Recetas");
+  if (!hoja) {
+    hoja = ss.insertSheet("Recetas");
+    hoja.appendRow(["ID", "Nombre", "Categoria", "JSON", "CreadoPor", "FechaActualizacion"]);
+  }
+  return hoja;
 }
