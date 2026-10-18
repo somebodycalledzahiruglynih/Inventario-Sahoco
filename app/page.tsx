@@ -353,11 +353,11 @@ export default function MobileSahocoApp() {
                   ? products.length
                   : products.filter(p => {
                       const catLower = (p.categoria || '').toLowerCase();
-                      if (cat.id === 'Insumos & Salado') return catLower.includes('salado') || catLower.includes('insumo') || catLower.includes('cocina');
-                      if (cat.id === 'Postres & Repostería') return catLower.includes('postre') || catLower.includes('reposter') || catLower.includes('synthia');
-                      if (cat.id === 'Bebidas') return catLower.includes('bebida') || catLower.includes('jugo') || catLower.includes('refresco') || catLower.includes('syrup') || catLower.includes('topping');
-                      if (cat.id === 'Desechables') return catLower.includes('desechable') || catLower.includes('empaque') || catLower.includes('envase');
-                      return p.categoria === cat.id;
+                      if (cat.id === 'Insumos & Salado') return catLower.includes('salado') || catLower.includes('insumo') || catLower.includes('cocina') || p.categoria === 'Insumos & Salado';
+                      if (cat.id === 'Postres & Repostería') return catLower.includes('postre') || catLower.includes('reposter') || catLower.includes('synthia') || p.categoria === 'Postres & Repostería';
+                      if (cat.id === 'Bebidas') return catLower.includes('bebida') || catLower.includes('jugo') || catLower.includes('refresco') || catLower.includes('syrup') || catLower.includes('topping') || p.categoria === 'Bebidas';
+                      if (cat.id === 'Desechables') return catLower.includes('desechable') || catLower.includes('empaque') || catLower.includes('envase') || p.categoria === 'Desechables';
+                      return false;
                     }).length;
 
                 return (

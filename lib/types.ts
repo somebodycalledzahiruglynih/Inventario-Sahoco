@@ -1,4 +1,4 @@
-export type UnitType = 'Paquete' | 'Unidad' | 'Cajas' | 'Libras' | 'Galón';
+export type UnitType = 'Paquete' | 'Unidad' | 'Cajas' | 'Libras' | 'Galón' | string;
 
 export type MainCategory = 'Insumos & Salado' | 'Postres & Repostería' | 'Bebidas' | 'Desechables';
 
