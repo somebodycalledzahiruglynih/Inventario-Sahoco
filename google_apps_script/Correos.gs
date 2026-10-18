@@ -25,7 +25,7 @@ var SAHOCO_CORREO_FUENTE_DISPLAY = "'Outfit','Inter',-apple-system,'Segoe UI',Ro
 
 // --- DESTINATARIOS OFICIALES ---
 function obtenerDestinatarios() {
-  return ["soyzahirxd@gmail.com", "somebodycalledzahir@gmail.com"];
+  return ["soyzahirxd@gmail.com", "somebodycalledzahir@gmail.com", "hugolirianobrito@gmail.com"];
 }
 
 // --- FUNCIONES AUXILIARES DE RENDIMIENTO HTML ---
