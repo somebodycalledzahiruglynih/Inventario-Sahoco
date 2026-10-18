@@ -113,16 +113,20 @@ export default function MobileSahocoApp() {
   };
 
   // Sync with Google Apps Script
+  // Nunca vacía el inventario: si la respuesta falla o llega vacía,
+  // se conservan los productos actuales y se muestra un aviso.
   const handleSync = async () => {
     setIsSyncing(true);
-    setSyncError(null);
     try {
-      const remote = await fetchRemoteProducts();
-      if (remote && remote.length > 0) {
-        setProducts(remote);
+      const result = await fetchRemoteProducts();
+      if (result.items.length > 0) {
+        setProducts(result.items);
+      }
+      if (result.source === 'remote') {
         setSyncError(null);
-      } else {
-        setProducts([]);
+      } else if (result.error) {
+        // Se están mostrando datos en caché mientras el backend falla
+        setSyncError(result.error);
       }
     } catch (e: any) {
       console.warn('Sync notice:', e);

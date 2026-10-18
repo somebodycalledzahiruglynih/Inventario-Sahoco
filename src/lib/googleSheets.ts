@@ -6,7 +6,7 @@ const LOCAL_STORAGE_KEY_WASTE = 'sahoco_waste_records_v1';
 const LOCAL_STORAGE_KEY_LOGS = 'sahoco_audit_logs_v1';
 const LOCAL_STORAGE_KEY_CONFIG = 'sahoco_sync_config_v1';
 
-export const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyg8SOTyfvp7jUnIPp1VFE3yNuIs-kR1lffDhXIskghKBh9JAky1t6j-Lnu1IkSIOnGrg/exec';
+export const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwQ_EvGVC51xkcKVcC7iuEQARl71TRyNMYefZMVG4fBJmKD--1JJ2uYBFq5RamTzcyPxQ/exec';
 
 export interface SyncConfig {
   scriptUrl: string;

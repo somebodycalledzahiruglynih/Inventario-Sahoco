@@ -40,9 +40,9 @@ const TARGET_SHEET_NAMES = ["Inv.", "Inv", "Inventario", "INVENTARIO", "INV."];
 const SHEET_AUDITORIA = "Auditoria";
 
 // ── EXPANSIÓN SAHOCO: Comisos / Recetas / Notificaciones ──
-// Agrega aquí los correos que deben recibir las alertas de comisos/mermas.
-// Si la lista está vacía, no se envía correo (el resto del sistema sigue igual).
-const SAHOCO_EMAIL_NOTIFICACIONES = [];
+// Correos que reciben las alertas: ajustes de stock, comisos/mermas y eliminaciones.
+// Deja la lista vacía [] para desactivar todos los correos.
+const SAHOCO_EMAIL_NOTIFICACIONES = ["soyzahirxd@gmail.com", "somebodycallezahir@gmail.com"];
 const SAHOCO_SHEET_COMISOS = "Comisos";
 const SAHOCO_SHEET_RECETAS = "Recetas";
 
@@ -55,7 +55,12 @@ function getTargetSpreadsheet() {
   }
   const active = SpreadsheetApp.getActiveSpreadsheet();
   if (active) return active;
-  throw new Error("No se encontró la hoja de cálculo activa. Vincula el script desde Extensiones > Apps Script o define GOOGLE_SHEET_ID.");
+  // Respaldo para proyectos independientes: buscar el archivo por nombre
+  const files = DriveApp.getFilesByName("INVENTARIO SAHOCO");
+  if (files.hasNext()) {
+    return SpreadsheetApp.open(files.next());
+  }
+  throw new Error("No se encontró la hoja de cálculo. Vincula el script desde Extensiones > Apps Script, o define GOOGLE_SHEET_ID (línea 36) con el ID de tu hoja.");
 }
 
 /**
@@ -186,6 +191,40 @@ function detectColumnMap(sheet, lastCol) {
 }
 
 /**
+ * Envía la notificación por correo de un ajuste de stock o una eliminación.
+ * Se desactiva automáticamente si SAHOCO_EMAIL_NOTIFICACIONES está vacío.
+ */
+function sahocoNotificarCambio_(detalle) {
+  try {
+    if (!SAHOCO_EMAIL_NOTIFICACIONES || SAHOCO_EMAIL_NOTIFICACIONES.length === 0) {
+      return;
+    }
+    const asunto = "📦 SAHOCO | " + (detalle.tipo || "Movimiento") + ": " + (detalle.producto || "Insumo");
+    const cuerpo = [
+      "MOVIMIENTO REGISTRADO EN SAHOCO",
+      "--------------------------------------",
+      "Tipo: " + (detalle.tipo || ""),
+      "Producto: " + (detalle.producto || ""),
+      (detalle.stockAnterior !== undefined && detalle.stockAnterior !== "" && detalle.stockAnterior !== null)
+        ? "Stock anterior: " + detalle.stockAnterior : "",
+      (detalle.stockNuevo !== undefined && detalle.stockNuevo !== "" && detalle.stockNuevo !== null)
+        ? "Stock nuevo: " + detalle.stockNuevo : "",
+      (detalle.sugerido !== undefined && detalle.sugerido !== null) ? "Cantidad sugerida: " + detalle.sugerido : "",
+      "Realizado por: " + (detalle.usuario || ""),
+      "Fecha: " + new Date().toLocaleString("es-DO")
+    ].filter(function (linea) { return linea !== ""; }).join("\n");
+
+    MailApp.sendEmail({
+      to: SAHOCO_EMAIL_NOTIFICACIONES.join(","),
+      subject: asunto,
+      body: cuerpo
+    });
+  } catch (e) {
+    // Un fallo de correo nunca debe romper la operación principal
+  }
+}
+
+/**
  * Registra un comiso en la pestaña "Comisos" (si no existe, la crea).
  * Nunca interrumpe la operación principal si falla.
  */
@@ -302,6 +341,7 @@ function handleRequest(e) {
           status: "success",
           count: 0,
           total: 0,
+          totalItems: 0,
           sheet: sheet.getName(),
           data: []
         });
@@ -406,6 +446,7 @@ function handleRequest(e) {
         status: "success",
         count: items.length,
         total: items.length,
+        totalItems: items.length,
         sheet: sheet.getName(),
         startRow: startRow,
         lastRow: lastRow,
@@ -426,9 +467,11 @@ function handleRequest(e) {
       const nombre = postData.nombre || "Insumo";
       const lastCol = Math.max(sheet.getLastColumn(), 14);
       const cols = detectColumnMap(sheet, lastCol);
+      let stockAnterior = "";
 
       if (rowIndex >= 3 && rowIndex <= sheet.getLastRow()) {
         // Stock actual (columna detectada, respaldo estándar: columna 6)
+        stockAnterior = sheet.getRange(rowIndex, cols.actual + 1).getValue();
         if (!isNaN(newActual)) {
           sheet.getRange(rowIndex, cols.actual + 1).setValue(newActual);
         }
@@ -496,6 +539,14 @@ function handleRequest(e) {
 
       if (!esComiso) {
         logAudit(ss, "ACTUALIZACIÓN", `Stock de "${nombre}" ajustado a ${newActual} por ${usuario}`, usuario);
+        sahocoNotificarCambio_({
+          tipo: "Ajuste de stock",
+          producto: nombre,
+          stockAnterior: stockAnterior,
+          stockNuevo: newActual,
+          sugerido: newSugerido,
+          usuario: usuario
+        });
       }
 
       return createJsonResponse({
@@ -563,23 +614,38 @@ function handleRequest(e) {
     if (action === "add" && postData && postData.item) {
       const item = postData.item;
       const usuario = postData.usuario || "Usuario Sahoco";
+      const existingCols = sheet.getLastColumn();
+      const lastCol = Math.max(existingCols, 12);
+      const cols = detectColumnMap(sheet, lastCol);
+      const newRowIndex = sheet.getLastRow() + 1;
+      const rowValues = new Array(lastCol).fill("");
 
-      sheet.appendRow([
-        item.id || ("PRD-" + (sheet.getLastRow() + 1)),
-        item.nombre || "Nuevo Insumo",
-        item.categoria || "Insumos & Salado",
-        item.suplidor || "Proveedor General",
-        item.unidad || "Unidad",
-        Number(item.stockActual) || 0,
-        Number(item.stockMinimo) || 0,
-        Number(item.stockMaximo) || 0,
-        Number(item.cantidadSugerida) || 0,
-        item.descripcion || "",
-        item.fechaVencimiento || "",
-        item.foto || "",
-        new Date().toISOString(),
-        usuario
-      ]);
+      // Escritura por columnas detectadas: compatible con hojas sin columna "Categoría"
+      // (en ese caso la categoría se calcula automáticamente en la app).
+      rowValues[cols.id] = newRowIndex - 2;
+      rowValues[cols.nombre] = item.nombre || "Nuevo Insumo";
+      rowValues[cols.suplidor] = item.suplidor || "Proveedor General";
+      rowValues[cols.unidad] = item.unidad || "Unidad";
+      const stockActual = Number(item.stockActual) || 0;
+      const stockMin = Number(item.stockMinimo) || 0;
+      const stockMax = Number(item.stockMaximo) || 0;
+      let sugerido = Number(item.cantidadSugerida) || 0;
+      if (sugerido === 0 && stockMax > stockActual) {
+        sugerido = Math.max(0, stockMax - stockActual);
+      }
+      rowValues[cols.actual] = stockActual;
+      rowValues[cols.min] = stockMin;
+      rowValues[cols.max] = stockMax;
+      rowValues[cols.sugerido] = sugerido;
+      rowValues[cols.descripcion] = item.descripcion || "";
+      rowValues[cols.vencimiento] = item.fechaVencimiento || "";
+      rowValues[cols.foto] = item.foto || "";
+
+      // Columnas 13/14 (Fecha y Usuario) solo si ya existen en la hoja
+      if (existingCols >= 13) rowValues[12] = new Date().toISOString();
+      if (existingCols >= 14) rowValues[13] = usuario;
+
+      sheet.getRange(newRowIndex, 1, 1, lastCol).setValues([rowValues]);
 
       logAudit(ss, "NUEVO_PRODUCTO", `Nuevo producto añadido: ${item.nombre}`, usuario);
 
@@ -618,6 +684,14 @@ function handleRequest(e) {
       }
 
       logAudit(ss, "ELIMINACION", `Insumo "${nombre}" eliminado por ${usuario}`, usuario);
+
+      if (deleted) {
+        sahocoNotificarCambio_({
+          tipo: "Producto eliminado",
+          producto: nombre,
+          usuario: usuario
+        });
+      }
 
       return createJsonResponse({
         status: "success",

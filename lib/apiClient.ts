@@ -135,8 +135,62 @@ function parseSafeNumber(val: any, defaultVal = 0): number {
   return isNaN(n) ? defaultVal : n;
 }
 
-// --- GOOGLE APPS SCRIPT SYNC: CARGA REAL DE LOS 131 INSUMOS ---
-export async function fetchRemoteProducts(): Promise<ProductItem[]> {
+// --- GOOGLE APPS SCRIPT SYNC: CARGA REAL DE LOS INSUMOS ---
+export interface RemoteProductsResult {
+  items: ProductItem[];
+  totalItems: number;
+  source: 'remote' | 'cache' | 'empty';
+  error?: string;
+}
+
+/**
+ * Extrae la lista de productos desde cualquier envoltura JSON del backend:
+ * - Array plano: [...]
+ * - Envoltura SAHOCO: { status, totalItems, data: [...] }
+ * - Variantes: { items: [...] }, { resultado: { data: [...] } }, data como string JSON.
+ */
+function extractItemsArray(json: any): any[] | null {
+  if (Array.isArray(json)) return json;
+  if (!json || typeof json !== 'object') return null;
+
+  const candidates: any[] = [json.data, json.items, json.rows, json.resultado, json.result];
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string') {
+      try {
+        const parsed = JSON.parse(candidate);
+        if (Array.isArray(parsed)) return parsed;
+        if (parsed && typeof parsed === 'object') {
+          if (Array.isArray(parsed.data)) return parsed.data;
+          if (Array.isArray(parsed.items)) return parsed.items;
+        }
+      } catch {
+        // El string no era JSON: ignorar
+      }
+      continue;
+    }
+    if (Array.isArray(candidate)) return candidate;
+    if (candidate && typeof candidate === 'object') {
+      if (Array.isArray(candidate.data)) return candidate.data;
+      if (Array.isArray(candidate.items)) return candidate.items;
+    }
+  }
+  return null;
+}
+
+/**
+ * Detecta filas de encabezado que algunos despliegues del backend incluyen
+ * como si fueran un producto más (ej. "Articulo", "No.") en lugar de empezar en la fila 3.
+ */
+function isHeaderLikeRow(row: any): boolean {
+  if (!row || typeof row !== 'object') return false;
+  const name = String(row.nombre || row.articulo || row.producto || '').trim().toLowerCase();
+  const noCell = String(row.no ?? '').trim().toLowerCase();
+  if (/^art[ií]culos?\.?$/.test(name)) return true;
+  if (noCell === 'no' || noCell === 'no.' || noCell === 'nº' || noCell === '#') return true;
+  return false;
+}
+
+export async function fetchRemoteProducts(): Promise<RemoteProductsResult> {
   let lastError: Error | null = null;
 
   // Determinar qué URLs intentar:
@@ -176,13 +230,40 @@ export async function fetchRemoteProducts(): Promise<ProductItem[]> {
       }
 
       const json = JSON.parse(text);
-      const rawData = Array.isArray(json) ? json : (json.data || json.items || []);
 
-      if (Array.isArray(rawData)) {
-        if (rawData.length === 0) {
-          return [];
-        }
+      // Respuesta de error explícita del backend (ej. { status: 'error', message: 'Hoja vacía' })
+      if (json && !Array.isArray(json) && json.status === 'error') {
+        throw new Error(json.message || 'El backend de Google Sheets reportó un error');
+      }
 
+      // El array interno vive en response.data (o variantes), nunca en la raíz
+      const extracted = extractItemsArray(json);
+
+      // Contador global reportado por el backend (si existe)
+      const serverTotal = parseSafeNumber(
+        json && !Array.isArray(json) ? (json.totalItems ?? json.count ?? json.total) : undefined,
+        -1
+      );
+
+      if (extracted === null) {
+        throw new Error('La respuesta del backend no contiene "data" con la lista de productos.');
+      }
+
+      // Nunca mostrar la fila de encabezado como producto (backend que inicia en la fila 2)
+      const rawData = extracted.filter((row: any) => !isHeaderLikeRow(row));
+
+      if (rawData.length === 0) {
+        // No vaciar el inventario: registrar el aviso e intentar la siguiente URL / caché
+        lastError = new Error(
+          serverTotal > 0
+            ? `El backend reporta ${serverTotal} productos pero "data" llegó vacío.`
+            : 'El backend devolvió una lista de productos vacía.'
+        );
+        console.warn(`[SAHOCO] ${lastError.message} (${url})`);
+        continue;
+      }
+
+      {
         const seen = new Set<string>();
         const items: ProductItem[] = rawData.map((row: any, idx: number) => {
           const nombre = String(row.nombre || row.articulo || row.producto || `Insumo ${idx + 1}`).trim();
@@ -222,9 +303,10 @@ export async function fetchRemoteProducts(): Promise<ProductItem[]> {
           };
         });
 
-        console.log(`[SAHOCO] Cargados en vivo ${items.length} productos de Google Sheets (${json.sheet || 'Inv.'})`);
+        const totalReportado = serverTotal > 0 ? serverTotal : items.length;
+        console.log(`[SAHOCO] Cargados en vivo ${items.length} productos de Google Sheets (totalItems backend: ${totalReportado})`);
         saveLocalProducts(items);
-        return items;
+        return { items, totalItems: totalReportado, source: 'remote' };
       }
     } catch (err: any) {
       lastError = err;
@@ -232,13 +314,13 @@ export async function fetchRemoteProducts(): Promise<ProductItem[]> {
     }
   }
 
-  // Si fallaron todas las llamadas, comprobar si hay datos en caché real
+  // Si fallaron todas las llamadas, usar la caché real sin vaciar el estado
   const cached = getLocalProducts();
   if (cached.length > 0) {
-    return cached;
+    return { items: cached, totalItems: cached.length, source: 'cache', error: lastError?.message };
   }
 
-  // Si no hay datos ni remotos ni en caché, lanzar error para que la UI informe al usuario
+  // Sin datos remotos ni caché: informar al usuario
   throw lastError || new Error('No se pudo establecer conexión con Google Sheets ni hay productos en memoria.');
 }
 
