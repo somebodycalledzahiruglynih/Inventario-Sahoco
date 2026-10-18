@@ -57,6 +57,7 @@ import { DeleteConfirmModal } from '../components/DeleteConfirmModal';
 import { AnalyticsDashboard } from '../components/AnalyticsDashboard';
 import { ComisoModal } from '../components/ComisoModal';
 import { MovementDetailModal } from '../components/MovementDetailModal';
+import { RestockModal } from '../components/RestockModal';
 import { ProductInfoModal } from '../components/ProductInfoModal';
 import { RecipesView } from '../components/RecipesView';
 import { RecipeFormModal, RecipeFormData } from '../components/RecipeFormModal';
@@ -120,6 +121,7 @@ export default function MobileSahocoApp() {
   const [comisoItem, setComisoItem] = useState<ProductItem | null>(null);
   const [isComisoOpen, setIsComisoOpen] = useState(false);
   const [movementDetail, setMovementDetail] = useState<HistoryRecord | null>(null);
+  const [restockItem, setRestockItem] = useState<ProductItem | null>(null);
 
   // Info + quick edit module (derived from products so edits reflect instantly)
   const [infoItemId, setInfoItemId] = useState<string | null>(null);
@@ -466,20 +468,29 @@ export default function MobileSahocoApp() {
   };
 
   // Restock from Shopping List
-  const handleRestockItem = (product: ProductItem, addedAmount: number) => {
+  const handleRestockItem = (
+    product: ProductItem,
+    addedAmount: number,
+    info?: { descripcion?: string; suplidor?: string }
+  ) => {
     const prevStock = product.stockActual;
-    const newStock = prevStock + addedAmount;
+    const newStock = Number((prevStock + addedAmount).toFixed(2));
     
     const updated = products.map(p => p.id === product.id ? { ...p, stockActual: newStock } : p);
     setProducts(updated);
     saveLocalProducts(updated);
+
+    const notasPartes: string[] = [];
+    if (info?.suplidor) notasPartes.push(`Repuesto de ${info.suplidor}`);
+    if (info?.descripcion) notasPartes.push(info.descripcion);
 
     addHistoryEntry(
       product,
       'COMPRA_RECIBIDA',
       `Reabasteció pedido (+${addedAmount} ${product.unidad}). Nuevo stock: ${newStock}`,
       prevStock,
-      newStock
+      newStock,
+      notasPartes.length > 0 ? { notas: notasPartes.join(' • ') } : undefined
     );
 
     confetti({
@@ -1198,6 +1209,7 @@ export default function MobileSahocoApp() {
               const qty = product.cantidadSugerida || Math.max(1, product.stockMaximo - product.stockActual);
               handleRestockItem(product, qty);
             }}
+            onOpenRestock={(product) => setRestockItem(product)}
             onUpdateSugerido={handleUpdateSugerido}
           />
         )}
@@ -1308,6 +1320,17 @@ export default function MobileSahocoApp() {
           onDelete={handleDeleteMovement}
         />
       )}
+
+      {/* 6c. Ventana de Reposición: información + cantidad + suplidor/descripción */}
+      <RestockModal
+        isOpen={!!restockItem}
+        product={restockItem}
+        onClose={() => setRestockItem(null)}
+        onConfirm={(product, cantidad, info) => {
+          handleRestockItem(product, cantidad, info);
+          setRestockItem(null);
+        }}
+      />
 
       {/* 7. Ficha de Información + Edición Rápida */}
       <ProductInfoModal

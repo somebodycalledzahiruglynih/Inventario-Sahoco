@@ -19,6 +19,7 @@ import { ProductThumb } from './ProductThumb';
 interface ShoppingListViewProps {
   products: ProductItem[];
   onRequestRestock: (product: ProductItem) => void;
+  onOpenRestock?: (product: ProductItem) => void;
   onUpdateSugerido: (product: ProductItem, newSugerido: number) => void;
 }
 
@@ -33,6 +34,7 @@ const REPOSICION_CATEGORIES: { id: MainCategory | 'Todos'; label: string; icon: 
 export const ShoppingListView: React.FC<ShoppingListViewProps> = ({
   products,
   onRequestRestock,
+  onOpenRestock,
   onUpdateSugerido: _onUpdateSugerido
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<MainCategory | 'Todos'>('Todos');
@@ -167,10 +169,21 @@ export const ShoppingListView: React.FC<ShoppingListViewProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {priorityCriticalItems.map(item => {
               const isOutOfStock = item.stockActual <= 0;
+              const openRestock = () => (onOpenRestock || onRequestRestock)(item);
               return (
                 <div
                   key={`priority-${item.id}`}
-                  className="flex items-center justify-between gap-3 bg-[#141414]/80 border border-red-500/20 rounded-2xl px-3 py-2.5"
+                  role="button"
+                  tabIndex={0}
+                  onClick={openRestock}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      openRestock();
+                    }
+                  }}
+                  title="Toca para ver la información y reponer"
+                  className="flex items-center justify-between gap-3 bg-[#141414]/80 border border-red-500/20 rounded-2xl px-3 py-2.5 cursor-pointer hover:bg-[#1a1a1a] hover:border-red-500/40 active:scale-[0.99] transition-all focus:outline-none focus:border-red-500/50"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <ProductThumb
@@ -180,7 +193,7 @@ export const ShoppingListView: React.FC<ShoppingListViewProps> = ({
                     />
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-xs text-white truncate block">
+                        <span className="font-bold text-xs text-white break-words block">
                           {item.nombre}
                         </span>
                         <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-red-500/20 text-red-400 border border-red-500/30 flex-none">
@@ -195,7 +208,10 @@ export const ShoppingListView: React.FC<ShoppingListViewProps> = ({
                   </div>
 
                   <button
-                    onClick={() => onRequestRestock(item)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openRestock();
+                    }}
                     className="flex items-center gap-1.5 py-1.5 px-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold shadow-[0_0_12px_rgba(16,185,129,0.3)] active:scale-95 transition-all flex-none"
                   >
                     <PackagePlus className="w-3.5 h-3.5" />
@@ -409,7 +425,7 @@ export const ShoppingListView: React.FC<ShoppingListViewProps> = ({
                             />
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5">
-                                <span className="font-bold text-xs sm:text-sm text-white truncate block">
+                                <span className="font-bold text-xs sm:text-sm text-white break-words block">
                                   {item.nombre}
                                 </span>
                                 {isOutOfStock ? (
