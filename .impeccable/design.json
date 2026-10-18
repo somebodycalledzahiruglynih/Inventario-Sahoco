@@ -1,0 +1,172 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-18T15:18:47-04:00",
+  "title": "Design System: SAHOCO Inventario",
+  "extensions": {
+    "colorMeta": {
+      "carbon": { "role": "neutral", "displayName": "Carbón", "canonical": "#0f0f0f", "tonalRamp": ["#0f0f0f", "#141414", "#1a1a1a", "#1f1f1f", "#242424", "#2e2e2e", "#3f3f46", "#52525b"] },
+      "brasa": { "role": "neutral", "displayName": "Brasa", "canonical": "#141414", "tonalRamp": ["#0d0d0d", "#141414", "#1b1b1b", "#222222", "#292929", "#303030", "#3a3a3a", "#454545"] },
+      "ceniza": { "role": "neutral", "displayName": "Ceniza", "canonical": "#1a1a1a", "tonalRamp": ["#0f0f0f", "#151515", "#1a1a1a", "#202020", "#262626", "#2d2d2d", "#363636", "#414141"] },
+      "ceniza-clara": { "role": "neutral", "displayName": "Ceniza Clara", "canonical": "#1f1f1f", "tonalRamp": ["#121212", "#181818", "#1f1f1f", "#252525", "#2b2b2b", "#323232", "#3b3b3b", "#464646"] },
+      "humo": { "role": "neutral", "displayName": "Humo", "canonical": "#242424", "tonalRamp": ["#161616", "#1d1d1d", "#242424", "#2a2a2a", "#303030", "#373737", "#404040", "#4b4b4b"] },
+      "filo": { "role": "neutral", "displayName": "El Filo", "canonical": "rgba(255,255,255,0.08)", "tonalRamp": ["rgba(255,255,255,0.04)", "rgba(255,255,255,0.06)", "rgba(255,255,255,0.08)", "rgba(255,255,255,0.12)", "rgba(255,255,255,0.18)", "rgba(255,255,255,0.28)", "rgba(255,255,255,0.40)", "rgba(255,255,255,0.55)"] },
+      "llama": { "role": "primary", "displayName": "Llama de Servicio", "canonical": "#f97316", "tonalRamp": ["#7c2d12", "#9a3412", "#c2410c", "#ea580c", "#f97316", "#fb923c", "#fdba74", "#ffedd5"] },
+      "llama-viva": { "role": "primary", "displayName": "Llama Viva", "canonical": "#fb923c", "tonalRamp": ["#7c2d12", "#9a3412", "#c2410c", "#ea580c", "#f97316", "#fb923c", "#fdba74", "#ffedd5"] },
+      "llama-profunda": { "role": "primary", "displayName": "Llama Profunda", "canonical": "#ea580c", "tonalRamp": ["#7c2d12", "#9a3412", "#c2410c", "#ea580c", "#f97316", "#fb923c", "#fdba74", "#ffedd5"] },
+      "tinte-llama": { "role": "primary", "displayName": "Tinte de Llama", "canonical": "rgba(249,115,22,0.15)", "tonalRamp": ["rgba(249,115,22,0.05)", "rgba(249,115,22,0.10)", "rgba(249,115,22,0.15)", "rgba(249,115,22,0.20)", "rgba(249,115,22,0.30)", "rgba(249,115,22,0.45)", "rgba(249,115,22,0.60)", "rgba(249,115,22,0.80)"] },
+      "texto": { "role": "neutral", "displayName": "Marfil", "canonical": "#f1f5f9", "tonalRamp": ["#0f172a", "#1e293b", "#334155", "#475569", "#64748b", "#94a3b8", "#cbd5e1", "#f1f5f9"] },
+      "texto-suave": { "role": "neutral", "displayName": "Pizarra", "canonical": "#94a3b8", "tonalRamp": ["#0f172a", "#1e293b", "#334155", "#475569", "#64748b", "#94a3b8", "#cbd5e1", "#f1f5f9"] },
+      "texto-tenue": { "role": "neutral", "displayName": "Niebla", "canonical": "#64748b", "tonalRamp": ["#0f172a", "#1e293b", "#334155", "#475569", "#64748b", "#94a3b8", "#cbd5e1", "#f1f5f9"] },
+      "senal-roja": { "role": "secondary", "displayName": "Rojo Merma", "canonical": "#ef4444", "tonalRamp": ["#7f1d1d", "#991b1b", "#b91c1c", "#dc2626", "#ef4444", "#f87171", "#fca5a5", "#fecaca"] },
+      "senal-ambar": { "role": "secondary", "displayName": "Ámbar Vencimiento", "canonical": "#f59e0b", "tonalRamp": ["#78350f", "#92400e", "#b45309", "#d97706", "#f59e0b", "#fbbf24", "#fcd34d", "#fde68a"] },
+      "senal-esmeralda": { "role": "secondary", "displayName": "Esmeralda Reposición", "canonical": "#10b981", "tonalRamp": ["#064e3b", "#065f46", "#047857", "#059669", "#10b981", "#34d399", "#6ee7b7", "#a7f3d0"] },
+      "senal-cielo": { "role": "secondary", "displayName": "Cielo Registro", "canonical": "#38bdf8", "tonalRamp": ["#0c4a6e", "#075985", "#0369a1", "#0284c7", "#0ea5e9", "#38bdf8", "#7dd3fc", "#bae6fd"] },
+      "senal-violeta": { "role": "secondary", "displayName": "Violeta Receta", "canonical": "#a855f7", "tonalRamp": ["#4c1d95", "#5b21b6", "#6d28d9", "#7c3aed", "#8b5cf6", "#a855f7", "#c4b5fd", "#ddd6fe"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display (Outfit 800)", "purpose": "Numerales de stock, KPIs de analítica y wordmark; sólo cifras y momentos de marca." },
+      "headline": { "displayName": "Headline (Inter 700)", "purpose": "Encabezados de sección y de modal." },
+      "title": { "displayName": "Title (Inter 700)", "purpose": "Nombres de insumos, proveedores y títulos de tarjeta." },
+      "body": { "displayName": "Body (Inter 500)", "purpose": "Descripciones, metadatos y detalle de auditoría; apoyo a 10–11px." },
+      "label": { "displayName": "Label (Inter 700)", "purpose": "Micro-etiquetas MAYÚSCULAS 9–10px y etiquetas de la nav inferior." }
+    },
+    "shadows": [
+      { "name": "card-rest", "value": "0 4px 20px -2px rgba(0,0,0,0.4)", "purpose": "Sombra de reposo de tarjetas (clase dark-card); variantes inline 0.25–0.3." },
+      { "name": "card-hover-glow", "value": "0 6px 24px -4px rgba(249,115,22,0.12)", "purpose": "Hover de tarjeta, junto al borde llama/25." },
+      { "name": "modal", "value": "0 24px 60px rgba(0,0,0,0.8)", "purpose": "Paneles de modal." },
+      { "name": "dropdown", "value": "0 16px 50px rgba(0,0,0,0.7)", "purpose": "Menús desplegables del header." },
+      { "name": "chrome-top", "value": "0 4px 20px rgba(0,0,0,0.5)", "purpose": "Cabecera sticky." },
+      { "name": "chrome-bottom", "value": "0 -4px 24px rgba(0,0,0,0.5)", "purpose": "Barra de navegación inferior fija." },
+      { "name": "glow-llama", "value": "0 0 20px -3px rgba(249,115,22,0.35)", "purpose": "Botones y FAB primarios en naranja." },
+      { "name": "glow-reposicion", "value": "0 0 15px rgba(16,185,129,0.3)", "purpose": "CTAs de reposición esmeralda." },
+      { "name": "glow-peligro", "value": "0 0 18px rgba(239,68,68,0.35)", "purpose": "CTAs destructivos y alertas críticas." }
+    ],
+    "motion": [
+      { "name": "ease-organic", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Transición de tarjetas (dark-card-hover) y hover de controles." },
+      { "name": "duration-fast", "value": "150ms", "purpose": "Menús y micro-estados." },
+      { "name": "duration-base", "value": "200ms", "purpose": "Hover/transición estándar." },
+      { "name": "duration-enter", "value": "350ms", "purpose": "Entrada de paneles (login, modales framer-motion)." },
+      { "name": "press", "value": "scale(0.95) – scale(0.99)", "purpose": "Feedback físico en todo control al presionar." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Botón Primario",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "CTA naranja plano con glow; sincronizar, copiar pedido, guardar.",
+      "html": "<button class=\"ds-btn-primary\">Sincronizar ahora</button>",
+      "css": ".ds-btn-primary { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:48px; padding:13px 16px; background:#f97316; color:#ffffff; border:none; border-radius:16px; font-family:Inter, system-ui, sans-serif; font-size:12px; font-weight:700; box-shadow:0 0 15px rgba(249,115,22,0.35); cursor:pointer; transition:background .2s cubic-bezier(0.16,1,0.3,1), transform .15s ease, box-shadow .2s ease; } .ds-btn-primary:hover { background:#ea580c; box-shadow:0 0 22px rgba(249,115,22,0.45); } .ds-btn-primary:focus-visible { outline:none; box-shadow:0 0 15px rgba(249,115,22,0.35), 0 0 0 3px rgba(249,115,22,0.25); } .ds-btn-primary:active { transform:scale(0.97); }"
+    },
+    {
+      "name": "FAB Central (Añadir)",
+      "kind": "button",
+      "refersTo": "fab-add",
+      "description": "Único elemento que rompe la línea de la nav; abre 'Añadir Insumo'.",
+      "html": "<button class=\"ds-fab\" aria-label=\"Añadir insumo al inventario\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5 12h14\"/><path d=\"M12 5v14\"/></svg></button>",
+      "css": ".ds-fab { width:48px; height:48px; display:flex; align-items:center; justify-content:center; border:none; border-radius:16px; background:linear-gradient(to top right, #ea580c, #fb923c); color:#ffffff; box-shadow:0 0 20px rgba(249,115,22,0.35); cursor:pointer; transition:transform .2s cubic-bezier(0.16,1,0.3,1), box-shadow .2s ease; } .ds-fab svg { width:24px; height:24px; } .ds-fab:hover { transform:scale(1.05); box-shadow:0 0 28px rgba(249,115,22,0.5); } .ds-fab:active { transform:scale(0.95); }"
+    },
+    {
+      "name": "Botones de Paso (− / +)",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Par de control de stock de 48px: rojo lavado para descontar, llama sólida para sumar.",
+      "html": "<div class=\"ds-steps\"><button class=\"ds-step ds-step-minus\" aria-label=\"Descontar 1 unidad\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\"><path d=\"M5 12h14\"/></svg></button><button class=\"ds-step ds-step-plus\" aria-label=\"Sumar 1 unidad\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5 12h14\"/><path d=\"M12 5v14\"/></svg></button></div>",
+      "css": ".ds-steps { display:flex; align-items:center; gap:8px; } .ds-step { width:48px; height:48px; display:flex; align-items:center; justify-content:center; border-radius:16px; cursor:pointer; transition:all .15s ease; } .ds-step svg { width:20px; height:20px; } .ds-step-minus { background:#242424; border:1px solid rgba(255,255,255,0.08); color:#f87171; } .ds-step-minus:hover { background:rgba(239,68,68,0.15); border-color:rgba(239,68,68,0.3); } .ds-step-plus { background:#f97316; border:none; color:#ffffff; box-shadow:0 0 16px rgba(249,115,22,0.3); } .ds-step-plus:hover { background:#fb923c; } .ds-step:active { transform:scale(0.95); }"
+    },
+    {
+      "name": "Badges de Estado",
+      "kind": "chip",
+      "refersTo": "badge-critical",
+      "description": "El semáforo del inventario: Agotado, Stock Bajo, Saludable. Tinte 15% + borde 25% + texto claro.",
+      "html": "<div class=\"ds-badge-row\"><span class=\"ds-badge ds-badge-critical\">Agotado</span><span class=\"ds-badge ds-badge-warning\">Stock Bajo</span><span class=\"ds-badge ds-badge-success\">Saludable</span></div>",
+      "css": ".ds-badge-row { display:flex; flex-wrap:wrap; gap:6px; } .ds-badge { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:9999px; font-family:Inter, system-ui, sans-serif; font-size:10px; font-weight:800; line-height:1.6; } .ds-badge-critical { background:rgba(239,68,68,0.15); color:#f87171; border:1px solid rgba(239,68,68,0.25); } .ds-badge-warning { background:rgba(245,158,11,0.15); color:#fbbf24; border:1px solid rgba(245,158,11,0.25); } .ds-badge-success { background:rgba(16,185,129,0.15); color:#34d399; border:1px solid rgba(16,185,129,0.25); }"
+    },
+    {
+      "name": "Chips de Categoría",
+      "kind": "chip",
+      "refersTo": "chip-selected",
+      "description": "Filtro horizontal de categorías con conteo interno; seleccionado en llama sólida.",
+      "html": "<div class=\"ds-chip-row\"><button class=\"ds-chip ds-chip-selected\"><span>🍟</span><span>Salado</span><span class=\"ds-chip-count\">12</span></button><button class=\"ds-chip\"><span>🍰</span><span>Postres</span><span class=\"ds-chip-count ds-chip-count-muted\">5</span></button></div>",
+      "css": ".ds-chip-row { display:flex; gap:8px; flex-wrap:nowrap; overflow-x:auto; } .ds-chip { display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border-radius:16px; background:#1a1a1a; border:1px solid rgba(255,255,255,0.08); color:#94a3b8; font-family:Inter, system-ui, sans-serif; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; transition:all .15s ease; } .ds-chip:hover { background:#242424; border-color:rgba(249,115,22,0.2); } .ds-chip-selected { background:#f97316; border-color:#f97316; color:#ffffff; box-shadow:0 0 12px rgba(249,115,22,0.35); } .ds-chip-selected:hover { background:#ea580c; } .ds-chip:active { transform:scale(0.95); } .ds-chip-count { padding:2px 6px; border-radius:9999px; background:rgba(255,255,255,0.2); color:#ffffff; font-size:10px; font-weight:900; } .ds-chip-count-muted { background:#242424; color:#64748b; }"
+    },
+    {
+      "name": "Campo de Búsqueda",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Input con icono a la izquierda; foco con borde llama/50 y ring tinte.",
+      "html": "<div class=\"ds-field\"><svg class=\"ds-field-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.3-4.3\"/></svg><input class=\"ds-input\" type=\"text\" placeholder=\"Buscar entre los productos por nombre o proveedor...\" /></div>",
+      "css": ".ds-field { position:relative; } .ds-field-icon { position:absolute; left:14px; top:50%; transform:translateY(-50%); width:16px; height:16px; color:#64748b; pointer-events:none; } .ds-input { width:100%; box-sizing:border-box; padding:14px 16px 14px 40px; background:#1f1f1f; border:1px solid rgba(255,255,255,0.08); border-radius:16px; color:#ffffff; font-family:Inter, system-ui, sans-serif; font-size:14px; font-weight:500; transition:border-color .15s ease, box-shadow .15s ease; } .ds-input::placeholder { color:#475569; } .ds-input:focus { outline:none; border-color:rgba(249,115,22,0.5); box-shadow:0 0 0 2px rgba(249,115,22,0.18); }"
+    },
+    {
+      "name": "Tarjeta de Insumo",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "ProductCard: la unidad fundamental — foto, badges, numeral de stock y controles ±.",
+      "html": "<div class=\"ds-product-card\"><div class=\"ds-product-top\"><div class=\"ds-product-photo\">🍗</div><div class=\"ds-product-info\"><span class=\"ds-product-badge\">Stock Bajo</span><h3 class=\"ds-product-name\">Pechuga de Pollo</h3><p class=\"ds-product-sub\">Sirena • Insumos &amp; Salado</p></div></div><div class=\"ds-product-bottom\"><div><span class=\"ds-product-label\">Stock actual</span><div class=\"ds-product-stock\"><span class=\"ds-product-number\">3</span><span class=\"ds-product-unit\">Libras</span></div></div><div class=\"ds-product-actions\"><button class=\"ds-step ds-step-minus\" aria-label=\"Descontar\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\"><path d=\"M5 12h14\"/></svg></button><button class=\"ds-step ds-step-plus\" aria-label=\"Sumar\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5 12h14\"/><path d=\"M12 5v14\"/></svg></button></div></div></div>",
+      "css": ".ds-product-card { background:#1a1a1a; border:1px solid rgba(255,255,255,0.07); border-radius:24px; padding:16px; box-shadow:0 4px 20px -2px rgba(0,0,0,0.4); font-family:Inter, system-ui, sans-serif; transition:border-color .2s cubic-bezier(0.16,1,0.3,1), box-shadow .2s ease; } .ds-product-card:hover { border-color:rgba(249,115,22,0.25); box-shadow:0 6px 24px -4px rgba(249,115,22,0.12); } .ds-product-top { display:flex; align-items:flex-start; gap:14px; } .ds-product-photo { width:80px; height:80px; flex:none; display:flex; align-items:center; justify-content:center; font-size:34px; background:#242424; border:1px solid rgba(255,255,255,0.08); border-radius:16px; } .ds-product-info { min-width:0; } .ds-product-badge { display:inline-flex; align-items:center; padding:2px 8px; border-radius:9999px; background:rgba(245,158,11,0.15); color:#fbbf24; border:1px solid rgba(245,158,11,0.25); font-size:10px; font-weight:800; } .ds-product-name { margin:6px 0 0; font-size:14px; font-weight:700; color:#ffffff; } .ds-product-sub { margin:2px 0 0; font-size:12px; color:#64748b; } .ds-product-bottom { margin-top:16px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.06); display:flex; align-items:center; justify-content:space-between; gap:12px; } .ds-product-label { display:block; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:#64748b; } .ds-product-stock { display:flex; align-items:baseline; gap:4px; } .ds-product-number { font-family:Outfit, Inter, sans-serif; font-size:24px; font-weight:900; color:#fbbf24; line-height:1.1; } .ds-product-unit { font-size:12px; font-weight:600; color:#94a3b8; } .ds-product-actions { display:flex; align-items:center; gap:8px; } .ds-step { width:48px; height:48px; display:flex; align-items:center; justify-content:center; border-radius:16px; cursor:pointer; transition:all .15s ease; } .ds-step svg { width:20px; height:20px; } .ds-step-minus { background:#242424; border:1px solid rgba(255,255,255,0.08); color:#f87171; } .ds-step-minus:hover { background:rgba(239,68,68,0.15); border-color:rgba(239,68,68,0.3); } .ds-step-plus { background:#f97316; border:none; color:#ffffff; box-shadow:0 0 16px rgba(249,115,22,0.3); } .ds-step-plus:hover { background:#fb923c; } .ds-step:active { transform:scale(0.95); }"
+    },
+    {
+      "name": "Tarjeta KPI (Stock Crítico)",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "KPI de analítica en estado crítico: filo rojo, numeral Outfit 800 y pie accionable.",
+      "html": "<div class=\"ds-kpi\"><div class=\"ds-kpi-head\"><span class=\"ds-kpi-label\">Stock Crítico</span><span class=\"ds-kpi-icon\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z\"/><path d=\"M12 9v4\"/><path d=\"M12 17h.01\"/></svg></span></div><div class=\"ds-kpi-value-row\"><span class=\"ds-kpi-value\">7</span><span class=\"ds-kpi-sub\">(2 agotados)</span></div><div class=\"ds-kpi-foot\">Ver reposición →</div></div>",
+      "css": ".ds-kpi { background:#1a1a1a; border:1px solid rgba(255,255,255,0.08); border-radius:24px; padding:18px 20px; box-shadow:0 4px 20px rgba(0,0,0,0.3); font-family:Inter, system-ui, sans-serif; } .ds-kpi-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; } .ds-kpi-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:#f87171; } .ds-kpi-icon { display:flex; align-items:center; justify-content:center; padding:8px; border-radius:12px; background:rgba(239,68,68,0.2); color:#f87171; border:1px solid rgba(239,68,68,0.3); } .ds-kpi-icon svg { width:16px; height:16px; } .ds-kpi-value-row { display:flex; align-items:baseline; gap:6px; } .ds-kpi-value { font-family:Outfit, Inter, sans-serif; font-size:30px; font-weight:800; color:#f87171; line-height:1.1; } .ds-kpi-sub { font-size:12px; color:#94a3b8; } .ds-kpi-foot { margin-top:10px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.06); font-size:10px; font-weight:700; color:#f87171; }"
+    },
+    {
+      "name": "Navegación Inferior",
+      "kind": "nav",
+      "refersTo": "nav-item-active",
+      "description": "Barra fija con tab activo en llama lavada y FAB central elevado.",
+      "html": "<nav class=\"ds-nav\"><button class=\"ds-nav-item\"><span class=\"ds-nav-icon\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m7.5 4.27 9 5.15\"/><path d=\"M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z\"/><path d=\"m3.3 7 8.7 5 8.7-5\"/><path d=\"M12 22V12\"/></svg></span><span class=\"ds-nav-label\">Insumos</span></button><button class=\"ds-nav-item ds-nav-item-active\"><span class=\"ds-nav-icon\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 3v18h18\"/><path d=\"M18 17V9\"/><path d=\"M13 17V5\"/><path d=\"M8 17v-3\"/></svg></span><span class=\"ds-nav-label\">Analítica</span></button><button class=\"ds-nav-fab\" aria-label=\"Añadir insumo\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5 12h14\"/><path d=\"M12 5v14\"/></svg></button><button class=\"ds-nav-item\"><span class=\"ds-nav-icon\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"8\" cy=\"21\" r=\"1\"/><circle cx=\"19\" cy=\"21\" r=\"1\"/><path d=\"M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12\"/></svg></span><span class=\"ds-nav-label\">Compras</span></button></nav>",
+      "css": ".ds-nav { display:flex; align-items:center; justify-content:space-around; gap:4px; padding:6px 8px 10px; background:rgba(20,20,20,0.95); border-top:1px solid rgba(255,255,255,0.07); border-radius:16px 16px 0 0; box-shadow:0 -4px 24px rgba(0,0,0,0.5); font-family:Inter, system-ui, sans-serif; } .ds-nav-item { display:flex; flex-direction:column; align-items:center; gap:2px; padding:2px 10px; background:none; border:none; cursor:pointer; color:#64748b; transition:color .15s ease; } .ds-nav-item:hover { color:#cbd5e1; } .ds-nav-label { font-size:9px; font-weight:600; } .ds-nav-icon { display:flex; align-items:center; justify-content:center; padding:6px; border-radius:12px; } .ds-nav-icon svg { width:20px; height:20px; } .ds-nav-item-active { color:#fb923c; } .ds-nav-item-active .ds-nav-label { font-weight:700; } .ds-nav-item-active .ds-nav-icon { background:rgba(249,115,22,0.15); } .ds-nav-fab { width:48px; height:48px; margin-top:-18px; display:flex; align-items:center; justify-content:center; border:none; border-radius:16px; background:linear-gradient(to top right, #ea580c, #fb923c); color:#ffffff; box-shadow:0 0 20px rgba(249,115,22,0.35); cursor:pointer; transition:transform .2s cubic-bezier(0.16,1,0.3,1); } .ds-nav-fab svg { width:24px; height:24px; } .ds-nav-fab:hover { transform:scale(1.05); } .ds-nav-fab:active { transform:scale(0.95); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "El Libro de Fuego",
+    "overview": "SAHOCO es un libro contable vivo que brilla en la oscuridad. La hoja de Google Sheets es la única fuente de verdad, y la app la viste como lo que es: un registro nocturno de cocina donde cada movimiento — consumo, comiso, reposición, receta — queda escrito con nombre y hora. El fondo es carbón casi negro (#0f0f0f); las superficies suben en pasos mínimos de ceniza; y una sola llama naranja (#f97316) marca todo lo que exige acción o atención. El naranja no decora: señala.\n\nEl sistema es de densidad operativa, no de exhibición. La información se organiza como una estación de trabajo: numerales grandes en Outfit 800 que se leen de un vistazo, micro-etiquetas susurradas en mayúsculas de 9–10px, y semáforos rojo/ámbar/esmeralda que nacen del estado real del inventario, nunca de la paleta decorativa. Todo se resuelve con el pulgar: controles de 48px mínimo, esquinas de 16–24px, lavados translúcidos del color de la señal sobre fondos carbón.\n\nEl brillo es un verbo. Las sombras son cálidas y oscuras (nunca hay luz blanca en este mundo), y el glow naranja/rojo/esmeralda aparece únicamente cuando algo es accionable o urgente: un botón primario, un insumo agotado, un lote pendiente de sincronizar. La alternativa clara y beige del prototipo anterior quedó retirada; este mundo es nocturno, premium y directo.",
+    "keyCharacteristics": [
+      "Una sola llama: acento naranja #f97316 sobre una escalera estricta de negros carbón.",
+      "Densidad de cocina: micro-etiquetas 9–10px en mayúsculas sobre numerales Outfit 800.",
+      "Ergonomía de pulgar: nada interactivo por debajo de 48px (`btn-thumb`), radios 16–24px.",
+      "Filos de humo: hairline blanco al 6–8 %; jamás un borde sólido claro.",
+      "Profundidad tonal + glow con propósito, reservado a acciones y alertas.",
+      "Señales semánticas (rojo/ámbar/esmeralda/cielo/violeta) asignadas por estado del inventario, no por decoración."
+    ],
+    "rules": [
+      { "name": "La Regla de una Sola Llama", "body": "El naranja es el único color de marca; nunca se introduce un segundo acento. Las señales roja/ámbar/esmeralda/cielo/violeta no son paleta alternativa: sólo aparecen cuando el estado del inventario las exige.", "section": "colors" },
+      { "name": "La Regla del Lavado y el Filo", "body": "Los colores semánticos viven como tinte al 15 % + borde al 25 % + texto del paso claro del mismo color (rojo-400, ámbar-400, esmeralda-400). Ningún estado pinta fondos sólidos saturados, salvo los CTA destructivos y de reposición.", "section": "colors" },
+      { "name": "La Regla del Filo de Humo", "body": "Ningún borde blanco sólido: todo contorno es rgba(255,255,255,0.05–0.08). La estructura la dibuja la luz, no la línea.", "section": "colors" },
+      { "name": "La Regla del Número Protagonista", "body": "La cifra es el héroe: stock, cantidades y KPIs siempre en Outfit 800+ y en blanco marfil o el color de señal que corresponda. Todo lo demás en la tarjeta es contexto y se apaga (slate-400/500).", "section": "typography" },
+      { "name": "La Regla de la Etiqueta Susurrada", "body": "Las micro-etiquetas nunca gritan: 9–10px, mayúsculas, tracking amplio, slate-400/500. Si una etiqueta compite con su número, está mal.", "section": "typography" },
+      { "name": "La Regla del Pulgar", "body": "Todo control interactivo mide mínimo 48×48px (`btn-thumb`), con `user-select: none` y `touch-action: manipulation`. Si no cabe para el pulgar con una mano, no pertenece a esta app.", "section": "layout" },
+      { "name": "La Regla del Ancho de Bolsillo", "body": "La columna de trabajo nunca supera 576px (`max-w-xl`); la app se sostiene con una mano en cocina, no en un escritorio.", "section": "layout" },
+      { "name": "La Regla del Brillo con Propósito", "body": "Nada brilla por decoración. El glow aparece sólo si el elemento es accionable (CTA) o si una alerta exige acción (insumo crítico, comiso, lote pendiente). Sin luz blanca, jamás.", "section": "elevation" },
+      { "name": "La Regla del Cristal Fijo", "body": "`backdrop-blur` se reserva a lo que queda anclado — overlays, cabecera de modal y barra inferior. Las tarjetas del flujo nunca llevan vidrio.", "section": "elevation" },
+      { "name": "La Regla de las Esquinas Gemelas", "body": "Botón, input y chip comparten el mismo radio de 16px: si un control nuevo no puede emparejar con esa familia, está fuera del sistema.", "section": "shapes" }
+    ],
+    "dos": [
+      "Do mantener el fondo Carbón (#0f0f0f) y las superficies estrictamente en la escalera #141414 → #1a1a1a → #1f1f1f → #242424; la jerarquía es tonal antes que sombreada.",
+      "Do reservar la Llama (#f97316) para acciones, estados seleccionados, numerales vivos y énfasis; concentrarla, no esparcirla.",
+      "Do construir estados nuevos con el patrón de señal: tinte 15 % + borde 25 % + texto del paso claro del mismo color.",
+      "Do usar Outfit 800+ sólo para cifras y momentos de marca; Inter 500–700 para todo el resto.",
+      "Do conservar mínimo 48px de zona táctil (`btn-thumb`) y radios de 16/24px en toda creación nueva.",
+      "Do mantener la interfaz en español (es-DO), con tono directo de cocina; los emojis solos se reservan a categorías, motivos y estados (🍟🍰🥤📦, 🔥, 🚨).",
+      "Do mostrar siempre el estado real: caché con aviso ante fallo, ceros honestos, badges sólo cuando el dato existe."
+    ],
+    "donts": [
+      "Don't introducir un segundo color de marca ni un tema claro; el mundo beige/marrón del prototipo anterior quedó retirado (src/ es legado, no referencia visual).",
+      "Don't pintar fondos grandes con colores saturados: los colores vivos viven en tintes /15, bordes /25 y sombras de glow; la única excepción son los CTA sólidos y el gradiente de chips seleccionados (Llama→Ámbar 600).",
+      "Don't usar gradientes fuera de las dos familias sancionadas: CTA naranja (`from-orange-600 to-orange-500/400`) y el lavado de insumos críticos (`from-red-500/[0.12] via-orange-500/[0.07]`).",
+      "Don't añadir bordes blancos sólidos ni superar ~8 % de blanco en filos y divisores.",
+      "Don't usar sombras con luz clara, ni `backdrop-blur` fuera de overlays y chrome fijo.",
+      "Don't cuadrar esquinas (mínimo 12px) ni crear controles por debajo de 44px.",
+      "Don't fabricar estados visuales que no existen en el inventario: si el dato no está, se muestra el vacío o el error con instrucciones — nunca un badge, stock o producto inventado."
+    ]
+  }
+}
