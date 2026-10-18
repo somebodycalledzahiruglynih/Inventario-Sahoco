@@ -344,6 +344,92 @@ function handleRequest(e) {
     }
   }
 
+  // 9. OBTENER PRIORIDADES GLOBALES (GET PRIORITIES - BLOQUE D)
+  if (action === "get_priorities") {
+    try {
+      var hojaP = sahocoPrioridadesSheet_(ss);
+      var lastRowP = hojaP.getLastRow();
+      var prioridades = [];
+
+      if (lastRowP >= 2) {
+        var filasP = hojaP.getRange(2, 1, lastRowP - 1, 4).getValues();
+        for (var p = 0; p < filasP.length; p++) {
+          var nombreP = String(filasP[p][0] || "").trim();
+          if (!nombreP) continue;
+          prioridades.push({
+            nombre: nombreP,
+            nivelPrioridad: String(filasP[p][1] || "Alta").trim() || "Alta",
+            marcadoPor: String(filasP[p][2] || "").trim(),
+            marcadoAt: filasP[p][3] ? String(filasP[p][3]) : ""
+          });
+        }
+      }
+
+      return output.setContent(JSON.stringify({ status: "success", count: prioridades.length, data: prioridades }));
+    } catch (errP) {
+      return output.setContent(JSON.stringify({ status: "error", message: errP.toString() }));
+    }
+  }
+
+  // 10. MARCAR / DESMARCAR PRIORIDAD GLOBAL (SAVE PRIORITY - BLOQUE D)
+  if (action === "save_priority" && e.postData) {
+    var lockPrio = LockService.getScriptLock();
+    try {
+      lockPrio.waitLock(10000);
+    } catch (errLock) {
+      return output.setContent(JSON.stringify({ status: "error", message: "El sistema está ocupado, intenta de nuevo en unos segundos" }));
+    }
+
+    try {
+      var reqPrio = JSON.parse(e.postData.contents);
+      var nombrePrio = String(reqPrio.nombre || "").trim();
+      var prioritarioPrio = reqPrio.prioritario === true;
+      var usuarioPrio = reqPrio.usuario || "SAHOCO";
+      var nivelPrio = String(reqPrio.nivelPrioridad || "Alta").trim();
+      if (nivelPrio !== "Alta" && nivelPrio !== "Media" && nivelPrio !== "Baja") nivelPrio = "Alta";
+
+      if (!nombrePrio) {
+        return output.setContent(JSON.stringify({ status: "error", message: "Falta el nombre del insumo" }));
+      }
+
+      var hojaSP = sahocoPrioridadesSheet_(ss);
+      var lastRowSP = hojaSP.getLastRow();
+      var clavePrio = sahocoNormalizarNombre_(nombrePrio);
+      var filasCoincidentes = [];
+
+      if (lastRowSP >= 2) {
+        var nombresSP = hojaSP.getRange(2, 1, lastRowSP - 1, 1).getValues();
+        for (var s = 0; s < nombresSP.length; s++) {
+          if (sahocoNormalizarNombre_(String(nombresSP[s][0] || "")) === clavePrio) {
+            filasCoincidentes.push(2 + s);
+          }
+        }
+      }
+
+      if (prioritarioPrio) {
+        if (filasCoincidentes.length > 0) {
+          hojaSP.getRange(filasCoincidentes[0], 1, 1, 4).setValues([[nombrePrio, nivelPrio, usuarioPrio, new Date().toISOString()]]);
+          // Eliminar duplicados históricos (de abajo hacia arriba para no mover índices)
+          for (var dup = filasCoincidentes.length - 1; dup >= 1; dup--) {
+            hojaSP.deleteRow(filasCoincidentes[dup]);
+          }
+        } else {
+          hojaSP.appendRow([nombrePrio, nivelPrio, usuarioPrio, new Date().toISOString()]);
+        }
+        return output.setContent(JSON.stringify({ status: "success", message: '"' + nombrePrio + '" marcado como prioritario para todos', prioritario: true }));
+      }
+
+      for (var e2 = filasCoincidentes.length - 1; e2 >= 0; e2--) {
+        hojaSP.deleteRow(filasCoincidentes[e2]);
+      }
+      return output.setContent(JSON.stringify({ status: "success", message: '"' + nombrePrio + '" ya no es prioritario', prioritario: false }));
+    } catch (errPrio) {
+      return output.setContent(JSON.stringify({ status: "error", message: errPrio.toString() }));
+    } finally {
+      try { lockPrio.releaseLock(); } catch (errR) {}
+    }
+  }
+
   return output.setContent(JSON.stringify({ status: "error", message: "Acción no válida" }));
 }
 
@@ -356,6 +442,28 @@ function sahocoRecetasSheet_(ss) {
   if (!hoja) {
     hoja = ss.insertSheet("Recetas");
     hoja.appendRow(["ID", "Nombre", "Categoria", "JSON", "CreadoPor", "FechaActualizacion"]);
+  }
+  return hoja;
+}
+
+// ====================================================================
+// BLOQUE D: PRIORIDADES GLOBALES (pestaña "Prioridades")
+// ====================================================================
+
+function sahocoNormalizarNombre_(nombre) {
+  return String(nombre || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function sahocoPrioridadesSheet_(ss) {
+  var hoja = ss.getSheetByName("Prioridades");
+  if (!hoja) {
+    hoja = ss.insertSheet("Prioridades");
+    hoja.appendRow(["Nombre", "Nivel", "MarcadoPor", "Fecha"]);
   }
   return hoja;
 }

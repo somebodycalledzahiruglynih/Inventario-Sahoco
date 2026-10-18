@@ -21,7 +21,9 @@ import {
   sendBulkStockUpdate,
   fetchRemoteRecipes,
   sendSaveRecipe,
-  sendDeleteRecipe
+  sendDeleteRecipe,
+  fetchRemotePriorities,
+  sendPriorityToggle
 } from '../lib/apiClient';
 import { getLocalRecipes, saveLocalRecipes, createRecipeId } from '../lib/recipes';
 import {
@@ -37,8 +39,11 @@ import {
   PriorityEntry,
   loadPriorities,
   savePriorities,
+  isPriorityProduct,
   toggleProductPriority,
-  applyPriorityToProducts
+  applyPriorityToProducts,
+  wasPriorityMigrationDone,
+  markPriorityMigrationDone
 } from '../lib/priority';
 
 import { LoginScreen } from '../components/LoginScreen';
@@ -191,6 +196,37 @@ export default function MobileSahocoApp() {
     } finally {
       setIsSyncing(false);
     }
+
+    // Prioridades GLOBALES: viven en Google Sheets (pestaña "Prioridades") y las
+    // comparten todos los perfiles/dispositivos. La caché local pinta al instante;
+    // si el backend falla, se conserva lo que ya había en el dispositivo.
+    // Migración única por dispositivo: si el backend todavía no tiene ninguna
+    // prioridad y este dispositivo ya tenía marcas, se suben para volverlas
+    // globales en lugar de perderlas.
+    try {
+      const remotePriorities = await fetchRemotePriorities();
+
+      if (!wasPriorityMigrationDone()) {
+        const local = loadPriorities();
+        if (remotePriorities.length === 0 && local.length > 0) {
+          // El autor de cada marca viaja en la propia entrada (marcadoPor)
+          for (const entry of local) {
+            await sendPriorityToggle(entry, true, entry.marcadoPor || 'SAHOCO');
+          }
+          setPriorities(local);
+          savePriorities(local);
+        } else {
+          setPriorities(remotePriorities);
+          savePriorities(remotePriorities);
+        }
+        markPriorityMigrationDone();
+      } else {
+        setPriorities(remotePriorities);
+        savePriorities(remotePriorities);
+      }
+    } catch (e: any) {
+      console.warn('Priorities sync notice:', e.message || e);
+    }
   };
 
   // Sync recipes with Google Sheets (pestaña "Recetas"), con respaldo local
@@ -326,13 +362,30 @@ export default function MobileSahocoApp() {
     scheduleBatchFlush();
   };
 
-  // ── PRIORIDAD DE INSUMOS: marcar/desmarcar insumo clave de cocina ──
-  const handleTogglePriority = (product: ProductItem) => {
-    setPriorities(prev => {
-      const next = toggleProductPriority(prev, product, currentUser || 'SAHOCO');
-      savePriorities(next);
-      return next;
-    });
+  // ── PRIORIDAD DE INSUMOS: marca/desmarca GLOBAL (se guarda en Google Sheets) ──
+  // Se aplica al instante en la UI y se sincroniza con el backend; si falla,
+  // se revierte porque la prioridad no tiene sentido solo en este dispositivo.
+  const handleTogglePriority = async (product: ProductItem) => {
+    const usuario = currentUser || 'SAHOCO';
+    const eraPrioritario = isPriorityProduct(priorities, product);
+
+    const optimista = toggleProductPriority(priorities, product, usuario);
+    setPriorities(optimista);
+    savePriorities(optimista);
+
+    const result = await sendPriorityToggle(product, !eraPrioritario, usuario);
+    if (!result.success) {
+      const revertido = toggleProductPriority(optimista, product, usuario);
+      setPriorities(revertido);
+      savePriorities(revertido);
+      showBatchNotice('No se pudo guardar la prioridad; verifica la conexión e intenta de nuevo');
+    } else {
+      showBatchNotice(
+        eraPrioritario
+          ? 'Prioridad quitada para todos los perfiles'
+          : 'Prioridad guardada para todos los perfiles'
+      );
+    }
   };
 
   // Mantiene la referencia de flush al día y limpia temporizadores al desmontar

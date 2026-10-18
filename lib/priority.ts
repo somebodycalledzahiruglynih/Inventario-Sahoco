@@ -1,9 +1,11 @@
 import { ProductItem } from './types';
 
 // ── PRIORIDAD DE INSUMOS CRÍTICOS ──
-// Los insumos marcados como clave (ej. papas, carne, aceite, pan) se guardan
-// localmente para que persistan entre sesiones y viajen como flag en cada
-// actualización de stock (Apps Script los destaca en el correo).
+// Las prioridades son GLOBALES: viven en la pestaña "Prioridades" de Google
+// Sheets (acciones get_priorities / save_priority) y las comparten todos los
+// perfiles y dispositivos. La copia local es solo caché para pintar al
+// instante; además viajan como flag en cada actualización de stock (Apps
+// Script los destaca en el correo).
 
 export interface PriorityEntry {
   nombre: string;
@@ -14,6 +16,30 @@ export interface PriorityEntry {
 }
 
 const PRIORITY_KEY = 'sahoco_priority_products_v1';
+const PRIORITY_MIGRATION_KEY = 'sahoco_priority_migrated_v1';
+
+/**
+ * Migración única por dispositivo: cuando el backend global de prioridades
+ * aún está vacío, la primera sincronización sube las marcas locales para que
+ * no se pierdan al pasar de almacenamiento local a Google Sheets.
+ */
+export function wasPriorityMigrationDone(): boolean {
+  if (typeof window === 'undefined') return true;
+  try {
+    return window.localStorage.getItem(PRIORITY_MIGRATION_KEY) === '1';
+  } catch {
+    return true;
+  }
+}
+
+export function markPriorityMigrationDone(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(PRIORITY_MIGRATION_KEY, '1');
+  } catch {
+    // Sin persistencia: la migración se reintentará en la próxima sesión
+  }
+}
 
 export function normalizeProductKey(nombre: string): string {
   return String(nombre || '')

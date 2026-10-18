@@ -1,6 +1,7 @@
 import { ProductItem, HistoryRecord, UserName, ComisoPayload, Recipe } from './types';
 import { PendingStockChange } from './pendingChanges';
 import { normalizeRecipe } from './recipes';
+import { PriorityEntry } from './priority';
 import { APPS_SCRIPT_ENDPOINT } from './appsScriptUrl';
 
 export { APPS_SCRIPT_ENDPOINT };
@@ -776,5 +777,96 @@ export function fileToBase64(file: File): Promise<string> {
     reader.onerror = (error) => reject(error);
     reader.readAsDataURL(file);
   });
+}
+
+/**
+ * Carga las prioridades globales guardadas en Google Sheets (pestaña "Prioridades").
+ * Son compartidas por TODOS los perfiles y dispositivos.
+ */
+export async function fetchRemotePriorities(): Promise<PriorityEntry[]> {
+  const urlsToTry: string[] = [];
+  if (typeof window !== 'undefined') {
+    urlsToTry.push('/api/inventory?action=get_priorities');
+  }
+  urlsToTry.push(`${APPS_SCRIPT_ENDPOINT}?action=get_priorities`);
+
+  let lastError: Error | null = null;
+  for (const url of urlsToTry) {
+    try {
+      const response = await fetch(url, { method: 'GET', headers: { Accept: 'application/json' } });
+      if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
+
+      const text = await response.text();
+      if (text.includes('<!DOCTYPE') || text.includes('<html')) {
+        throw new Error('Apps Script devolvió HTML en lugar de JSON');
+      }
+
+      const json = JSON.parse(text);
+      if (json && !Array.isArray(json) && json.status === 'error') {
+        throw new Error(json.message || 'El backend no reconoce get_priorities');
+      }
+
+      const rawData = Array.isArray(json) ? json : (json.data || []);
+      if (!Array.isArray(rawData)) throw new Error('Formato de prioridades no reconocido');
+
+      const niveles: Array<PriorityEntry['nivelPrioridad']> = ['Alta', 'Media', 'Baja'];
+      return rawData
+        .map((r: any) => {
+          const nivel = String(r.nivelPrioridad || r.nivel || 'Alta') as PriorityEntry['nivelPrioridad'];
+          return {
+            nombre: String(r.nombre || r.articulo || r.producto || '').trim(),
+            nivelPrioridad: niveles.includes(nivel) ? nivel : 'Alta',
+            marcadoPor: String(r.marcadoPor || r.usuario || ''),
+            marcadoAt: String(r.marcadoAt || r.fecha || '')
+          };
+        })
+        .filter(e => e.nombre !== '');
+    } catch (err: any) {
+      lastError = err;
+    }
+  }
+  throw lastError || new Error('No se pudieron cargar las prioridades remotas');
+}
+
+/**
+ * Marca/desmarca un insumo como prioritario PARA TODOS los perfiles.
+ * A diferencia de los cambios de stock, esta acción no tiene sentido solo
+ * local: si el backend falla, se informa para que la UI revierta.
+ */
+export async function sendPriorityToggle(
+  product: { id?: string; nombre: string; rowIndex?: number },
+  prioritario: boolean,
+  usuario: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const payload = {
+      action: 'save_priority',
+      nombre: product.nombre,
+      id: product.id,
+      rowIndex: product.rowIndex,
+      prioritario: prioritario,
+      nivelPrioridad: 'Alta',
+      usuario: usuario,
+      timestamp: new Date().toISOString()
+    };
+
+    const postUrl = typeof window !== 'undefined'
+      ? '/api/inventory?action=save_priority'
+      : `${APPS_SCRIPT_ENDPOINT}?action=save_priority`;
+    const res = await fetch(postUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const text = await res.text();
+    if (text.includes('<!DOCTYPE')) {
+      return { success: false, message: 'Apps Script no devolvió JSON' };
+    }
+    const json = JSON.parse(text);
+    return { success: json.status === 'success', message: json.message || 'Prioridad actualizada' };
+  } catch (err: any) {
+    return { success: false, message: err.message };
+  }
 }
 
