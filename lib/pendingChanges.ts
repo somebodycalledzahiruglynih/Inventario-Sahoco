@@ -13,6 +13,7 @@ export interface PendingStockChange {
   actual: number;
   sugerido: number;
   stockAnterior: number;
+  sugeridoAnterior?: number;
   usuario: string;
   lastAt: string;
   esPrioritario?: boolean;
@@ -98,6 +99,7 @@ export function queuePendingChange(
           nombre: change.nombre || c.nombre,
           actual: change.actual,
           sugerido: change.sugerido,
+          sugeridoAnterior: c.sugeridoAnterior ?? change.sugeridoAnterior,
           usuario: change.usuario || c.usuario,
           lastAt: change.lastAt,
           esPrioritario: change.esPrioritario,

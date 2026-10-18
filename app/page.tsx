@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Filter, AlertTriangle, Plus, BarChart3, Package, ShoppingCart, Clock } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
-import { ProductItem, HistoryRecord, UserName, MainCategory, ComisoPayload, Recipe, RecipeCategory } from '../lib/types';
+import { ProductItem, HistoryRecord, UserName, MainCategory, ComisoPayload, Recipe, RecipeCategory, MotivoComiso, MovementCorrectionDraft } from '../lib/types';
 import { 
   getCurrentUser, 
   setCurrentUser, 
@@ -56,7 +56,7 @@ import { AddProductModal } from '../components/AddProductModal';
 import { DeleteConfirmModal } from '../components/DeleteConfirmModal';
 import { AnalyticsDashboard } from '../components/AnalyticsDashboard';
 import { ComisoModal } from '../components/ComisoModal';
-import { ComisoDetailModal } from '../components/ComisoDetailModal';
+import { MovementDetailModal } from '../components/MovementDetailModal';
 import { ProductInfoModal } from '../components/ProductInfoModal';
 import { RecipesView } from '../components/RecipesView';
 import { RecipeFormModal, RecipeFormData } from '../components/RecipeFormModal';
@@ -119,7 +119,7 @@ export default function MobileSahocoApp() {
   // Comiso / Merma module
   const [comisoItem, setComisoItem] = useState<ProductItem | null>(null);
   const [isComisoOpen, setIsComisoOpen] = useState(false);
-  const [comisoDetail, setComisoDetail] = useState<HistoryRecord | null>(null);
+  const [movementDetail, setMovementDetail] = useState<HistoryRecord | null>(null);
 
   // Info + quick edit module (derived from products so edits reflect instantly)
   const [infoItemId, setInfoItemId] = useState<string | null>(null);
@@ -355,6 +355,7 @@ export default function MobileSahocoApp() {
       actual: newActual,
       sugerido: newSugerido,
       stockAnterior: product.stockActual,
+      sugeridoAnterior: product.cantidadSugerida,
       usuario: currentUser || 'SAHOCO',
       lastAt: new Date().toISOString(),
       esPrioritario: product.esPrioritario === true,
@@ -594,18 +595,26 @@ export default function MobileSahocoApp() {
     updateQueue(prev => removePendingForProduct(prev, current));
   };
 
-  // Detalle + corrección de un comiso ya registrado (desde el historial)
-  const handleSaveComisoCorrection = async (record: HistoryRecord, draft: ComisoPayload) => {
+  // Detalle + corrección de un movimiento ya registrado (desde el historial)
+  const handleSaveMovementCorrection = async (record: HistoryRecord, draft: MovementCorrectionDraft) => {
     const product = products.find(p => p.id === record.itemId) || null;
+    const usuario = currentUser || 'SAHOCO';
 
-    const qtyOriginal = typeof record.cantidadAnterior === 'number' && typeof record.cantidadNueva === 'number'
-      ? Number((record.cantidadAnterior - record.cantidadNueva).toFixed(2))
-      : null;
+    const hasQtyData = typeof record.cantidadAnterior === 'number' && typeof record.cantidadNueva === 'number';
+    const signedOld = hasQtyData ? Number((record.cantidadNueva! - record.cantidadAnterior!).toFixed(2)) : null;
+    const sign = signedOld !== null && signedOld < 0 ? -1 : 1;
+    const canEditQty = signedOld !== null && signedOld !== 0;
+    const newSigned = canEditQty ? Number((sign * draft.cantidad).toFixed(2)) : signedOld;
+    const delta = canEditQty && signedOld !== null && newSigned !== null ? Number((newSigned - signedOld).toFixed(2)) : 0;
+    const isComiso = record.tipo === 'COMISO';
+    const comisoCantidad = canEditQty ? draft.cantidad : Math.abs(signedOld ?? 0);
+    const motivoFinal = (draft.motivo || (record.motivo as MotivoComiso) || 'Otro') as MotivoComiso;
+    const vencimientoFinal = isComiso ? (draft.fechaVencimiento ?? record.fechaVencimiento) : record.fechaVencimiento;
+    const notasFinal = draft.notas ? draft.notas : undefined;
 
-    // Ajustar el stock real por la diferencia corregida y sincronizar la celda en Sheets
-    if (product) {
-      const delta = qtyOriginal !== null ? Number((draft.cantidad - qtyOriginal).toFixed(2)) : 0;
-      const newStock = Math.max(0, Number((product.stockActual - delta).toFixed(2)));
+    // Ajustar el stock real por la diferencia corregida y sincronizar con Google Sheets
+    if (product && (delta !== 0 || isComiso)) {
+      const newStock = Math.max(0, Number((product.stockActual + delta).toFixed(2)));
 
       if (delta !== 0) {
         const updatedProducts = products.map(p => (p.id === product.id ? { ...p, stockActual: newStock } : p));
@@ -620,40 +629,67 @@ export default function MobileSahocoApp() {
           product,
           newStock,
           product.cantidadSugerida,
-          currentUser || 'SAHOCO',
+          usuario,
           undefined,
-          {
-            cantidad: draft.cantidad,
-            motivo: draft.motivo,
-            fechaVencimiento: draft.fechaVencimiento || '',
-            notas: draft.notas || ''
-          }
+          isComiso
+            ? {
+                cantidad: comisoCantidad,
+                motivo: motivoFinal,
+                fechaVencimiento: vencimientoFinal || '',
+                notas: notasFinal || ''
+              }
+            : undefined
         );
       } catch (err) {
-        console.warn('Comiso correction sync notice:', err);
+        console.warn('Movement correction sync notice:', err);
       }
     }
 
-    const stockNuevoRegistro = typeof record.cantidadAnterior === 'number'
-      ? Number((record.cantidadAnterior - draft.cantidad).toFixed(2))
+    const stockNuevoRegistro = canEditQty && signedOld !== null && typeof record.cantidadAnterior === 'number' && newSigned !== null
+      ? Number((record.cantidadAnterior + newSigned).toFixed(2))
       : record.cantidadNueva;
 
     const unidadTxt = product ? ` ${product.unidad}` : '';
-    const detailParts = [
-      `Comiso/Merma de ${draft.cantidad}${unidadTxt}${typeof record.cantidadAnterior === 'number' ? ` (stock: ${record.cantidadAnterior} → ${stockNuevoRegistro})` : ''}`,
-      `Motivo: ${draft.motivo}`
-    ];
-    if (draft.fechaVencimiento) detailParts.push(`Venció: ${draft.fechaVencimiento}`);
-    if (draft.notas) detailParts.push(`Nota: ${draft.notas}`);
-    detailParts.push(`Corregido por ${currentUser || 'SAHOCO'}`);
+    const A = record.cantidadAnterior;
+    const N = stockNuevoRegistro;
+    let detalle: string;
+
+    switch (record.tipo) {
+      case 'INCREMENTO':
+        detalle = `Sumó existencias de ${A} a ${N}${unidadTxt}`;
+        break;
+      case 'DECREMENTO':
+        detalle = `Consumo/Descuento de ${A} a ${N}${unidadTxt}`;
+        break;
+      case 'COMPRA_RECIBIDA':
+        detalle = `Reabasteció pedido (+${Math.abs(newSigned ?? 0)}${unidadTxt}). Nuevo stock: ${N}`;
+        break;
+      case 'PREPARACION_PLATO': {
+        const match = record.detalle.match(/preparación de "([^"]+)"/i);
+        detalle = `Usado en preparación de "${match ? match[1] : 'un plato'}" (-${Math.abs(newSigned ?? 0)}${unidadTxt}, stock: ${A} → ${N})`;
+        break;
+      }
+      case 'COMISO': {
+        const parts = [`Comiso/Merma de ${comisoCantidad}${unidadTxt}`];
+        if (typeof A === 'number' && typeof N === 'number') parts[0] += ` (stock: ${A} → ${N})`;
+        parts.push(`Motivo: ${motivoFinal}`);
+        if (vencimientoFinal) parts.push(`Venció: ${vencimientoFinal}`);
+        if (notasFinal) parts.push(`Nota: ${notasFinal}`);
+        detalle = parts.join(' • ');
+        break;
+      }
+      default:
+        detalle = record.detalle;
+    }
+    detalle += ` • Corregido por ${usuario}`;
 
     const updatedRecord: HistoryRecord = {
       ...record,
-      detalle: detailParts.join(' • '),
+      detalle,
       cantidadNueva: stockNuevoRegistro,
-      motivo: draft.motivo,
-      fechaVencimiento: draft.fechaVencimiento || undefined,
-      notas: draft.notas || undefined
+      motivo: isComiso ? motivoFinal : record.motivo,
+      fechaVencimiento: isComiso ? (vencimientoFinal || undefined) : record.fechaVencimiento,
+      notas: notasFinal
     };
 
     setHistory(prev => {
@@ -661,7 +697,86 @@ export default function MobileSahocoApp() {
       saveLocalHistory(updated);
       return updated;
     });
-    setComisoDetail(updatedRecord);
+    setMovementDetail(updatedRecord);
+  };
+
+  // Eliminación de un registro del historial (revierte el stock cuando aplica)
+  const handleDeleteMovement = async (record: HistoryRecord) => {
+    const product = products.find(p => p.id === record.itemId) || null;
+    const usuario = currentUser || 'SAHOCO';
+    const hasQtyData = typeof record.cantidadAnterior === 'number' && typeof record.cantidadNueva === 'number';
+    const signedOld = hasQtyData ? Number((record.cantidadNueva! - record.cantidadAnterior!).toFixed(2)) : null;
+    const revertsStock = !!product && signedOld !== null && signedOld !== 0;
+
+    if (revertsStock && product && signedOld !== null) {
+      const newStock = Math.max(0, Number((product.stockActual - signedOld).toFixed(2)));
+      const updatedProducts = products.map(p => (p.id === product.id ? { ...p, stockActual: newStock } : p));
+      setProducts(updatedProducts);
+      saveLocalProducts(updatedProducts);
+      // El lote pendiente ya no debe reescribir el stock revertido
+      updateQueue(prev => removePendingForProduct(prev, product));
+
+      try {
+        await sendStockUpdate(product, newStock, product.cantidadSugerida, usuario);
+      } catch (err) {
+        console.warn('Movement delete sync notice:', err);
+      }
+    }
+
+    setHistory(prev => {
+      const updated = prev.filter(h => h.id !== record.id);
+      saveLocalHistory(updated);
+      return updated;
+    });
+
+    setMovementDetail(null);
+    showBatchNotice(
+      revertsStock
+        ? 'Registro eliminado y stock revertido en Google Sheets'
+        : 'Registro eliminado del historial'
+    );
+  };
+
+  // Deshacer los cambios del lote que todavía no se han enviado a Google Sheets
+  const cancelPendingChanges = () => {
+    if (isFlushingRef.current) return;
+    const queue = loadPendingChanges();
+    if (queue.length === 0) return;
+
+    if (flushTimerRef.current) {
+      clearTimeout(flushTimerRef.current);
+      flushTimerRef.current = null;
+    }
+
+    const revertedProducts = products.map(p => {
+      const change = queue.find(c => c.rowIndex === p.rowIndex || (!!c.id && c.id === p.id));
+      if (!change) return p;
+      return {
+        ...p,
+        stockActual: typeof change.stockAnterior === 'number' ? change.stockAnterior : p.stockActual,
+        cantidadSugerida: typeof change.sugeridoAnterior === 'number' ? change.sugeridoAnterior : p.cantidadSugerida
+      };
+    });
+    setProducts(revertedProducts);
+    saveLocalProducts(revertedProducts);
+
+    // Quitar del historial las entradas de auditoría de esos cambios cancelados
+    setHistory(prev => {
+      const remaining = [...prev];
+      queue.forEach(change => {
+        const idx = remaining.findIndex(h =>
+          h.itemId === change.id &&
+          (h.tipo === 'INCREMENTO' || h.tipo === 'DECREMENTO' || h.tipo === 'COMPRA_RECIBIDA' || h.tipo === 'SUGERIDO_EDITADO') &&
+          (h.tipo === 'SUGERIDO_EDITADO' || h.cantidadNueva === change.actual)
+        );
+        if (idx >= 0) remaining.splice(idx, 1);
+      });
+      saveLocalHistory(remaining);
+      return remaining;
+    });
+
+    updateQueue(() => []);
+    showBatchNotice('Cambios pendientes cancelados: el stock volvió a como estaba antes');
   };
 
   // ── MÓDULO 3: FICHA + EDICIÓN RÁPIDA DE INSUMO ──
@@ -909,7 +1024,7 @@ export default function MobileSahocoApp() {
             onNavigateToShopping={() => setCurrentTab('shopping')}
             onRequestComiso={() => handleRequestComiso(null)}
             onNavigateToRecipes={() => setCurrentTab('recipes')}
-            onOpenComiso={setComisoDetail}
+            onOpenRecord={setMovementDetail}
           />
         )}
 
@@ -1091,7 +1206,7 @@ export default function MobileSahocoApp() {
         {currentTab === 'history' && (
           <HistoryView
             history={history}
-            onOpenComiso={setComisoDetail}
+            onOpenRecord={setMovementDetail}
           />
         )}
 
@@ -1136,12 +1251,21 @@ export default function MobileSahocoApp() {
                 Se envía un solo correo al pasar {Math.round(getBatchWindowMs() / 60000)} min sin cambios
               </p>
             </div>
-            <button
-              onClick={() => flushPendingChanges(false)}
-              className="px-3 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-[11px] font-bold shadow-[0_0_15px_rgba(249,115,22,0.35)] active:scale-95 transition-all flex-none"
-            >
-              Sincronizar ahora
-            </button>
+            <div className="flex items-center gap-2 flex-none">
+              <button
+                onClick={cancelPendingChanges}
+                className="px-3 py-2 rounded-xl bg-[#242424] hover:bg-[#2c2c2c] text-slate-300 border border-white/[0.08] text-[11px] font-bold active:scale-95 transition-all flex-none"
+                title="Deshacer los cambios pendientes y volver al stock anterior"
+              >
+                Deshacer
+              </button>
+              <button
+                onClick={() => flushPendingChanges(false)}
+                className="px-3 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-[11px] font-bold shadow-[0_0_15px_rgba(249,115,22,0.35)] active:scale-95 transition-all flex-none"
+              >
+                Sincronizar ahora
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1173,14 +1297,15 @@ export default function MobileSahocoApp() {
         onConfirm={handleConfirmComiso}
       />
 
-      {/* 6b. Detalle + Corrección de un Comiso (desde el historial) */}
-      {comisoDetail && (
-        <ComisoDetailModal
-          key={comisoDetail.id}
-          record={comisoDetail}
-          product={products.find(p => p.id === comisoDetail.itemId) || null}
-          onClose={() => setComisoDetail(null)}
-          onSaveCorrection={handleSaveComisoCorrection}
+      {/* 6b. Detalle + Corrección de Movimientos (desde el historial) */}
+      {movementDetail && (
+        <MovementDetailModal
+          key={movementDetail.id}
+          record={movementDetail}
+          product={products.find(p => p.id === movementDetail.itemId) || null}
+          onClose={() => setMovementDetail(null)}
+          onSaveCorrection={handleSaveMovementCorrection}
+          onDelete={handleDeleteMovement}
         />
       )}
 

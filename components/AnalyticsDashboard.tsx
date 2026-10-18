@@ -22,7 +22,7 @@ interface AnalyticsDashboardProps {
   onNavigateToShopping: () => void;
   onRequestComiso: () => void;
   onNavigateToRecipes: () => void;
-  onOpenComiso?: (record: HistoryRecord) => void;
+  onOpenRecord?: (record: HistoryRecord) => void;
 }
 
 export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
@@ -31,7 +31,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
   onNavigateToShopping,
   onRequestComiso,
   onNavigateToRecipes,
-  onOpenComiso
+  onOpenRecord
 }) => {
   // Real dynamic KPI calculations from sheet data
   const totalInsumos = products.length;
@@ -298,7 +298,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                       className="w-10 h-10 rounded-xl bg-[#242424] flex-none border border-white/[0.08]"
                     />
                     <div className="min-w-0">
-                      <span className="font-bold text-xs sm:text-sm text-white truncate block">
+                      <span className="font-bold text-xs sm:text-sm text-white break-words block">
                         {item.nombre}
                       </span>
                       <span className="text-[10px] text-slate-400 block">
@@ -349,22 +349,22 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
         ) : (
           <div className="divide-y divide-white/[0.06]">
             {history.slice(0, 5).map(record => {
-              const isComiso = record.tipo === 'COMISO' && !!onOpenComiso;
+              const isInteractive = !!onOpenRecord;
               return (
               <div
                 key={record.id}
-                role={isComiso ? 'button' : undefined}
-                tabIndex={isComiso ? 0 : undefined}
-                onClick={isComiso ? () => onOpenComiso(record) : undefined}
-                onKeyDown={isComiso ? (e) => {
+                role={isInteractive ? 'button' : undefined}
+                tabIndex={isInteractive ? 0 : undefined}
+                onClick={isInteractive ? () => onOpenRecord(record) : undefined}
+                onKeyDown={isInteractive ? (e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    onOpenComiso(record);
+                    onOpenRecord(record);
                   }
                 } : undefined}
-                title={isComiso ? 'Toca para ver el detalle completo y editar' : undefined}
+                title={isInteractive ? 'Toca para ver el detalle completo' : undefined}
                 className={`py-2.5 flex items-center justify-between gap-3 text-xs rounded-xl transition-colors ${
-                  isComiso ? 'cursor-pointer hover:bg-white/[0.04] focus:outline-none' : ''
+                  isInteractive ? 'cursor-pointer hover:bg-white/[0.04] focus:outline-none' : ''
                 }`}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -375,10 +375,10 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                     iconClassName="w-3.5 h-3.5"
                   />
                   <div className="min-w-0">
-                    <span className="font-bold text-white block truncate">
+                    <span className="font-bold text-white block break-words">
                       {record.itemNombre}
                     </span>
-                    <span className="text-[11px] text-slate-400 block truncate">
+                    <span className="text-[11px] text-slate-400 block line-clamp-2 break-words">
                       {record.detalle}
                     </span>
                   </div>
@@ -393,7 +393,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                       {new Intl.DateTimeFormat('es-DO', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }).format(new Date(record.timestamp))}
                     </span>
                   </div>
-                  {isComiso && (
+                  {isInteractive && (
                     <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
                   )}
                 </div>

@@ -63,6 +63,39 @@ export const MOTIVOS_COMISO: MotivoComiso[] = [
   'Otro'
 ];
 
+// Tipos de registro que mueven stock y por lo tanto se pueden corregir o eliminar
+// devolviendo/ajustando la cantidad en el inventario.
+export const STOCK_MOVEMENT_TYPES: HistoryTipo[] = [
+  'INCREMENTO',
+  'DECREMENTO',
+  'COMPRA_RECIBIDA',
+  'COMISO',
+  'PREPARACION_PLATO'
+];
+
+export const HISTORY_TYPE_LABELS: Record<HistoryTipo, string> = {
+  INCREMENTO: 'Entrada de stock',
+  DECREMENTO: 'Salida de stock',
+  SUGERIDO_EDITADO: 'Sugerido editado',
+  NUEVO_PRODUCTO: 'Nuevo insumo',
+  ELIMINACION_PRODUCTO: 'Insumo eliminado',
+  COMPRA_RECIBIDA: 'Compra recibida',
+  COMISO: 'Comiso / Merma',
+  PREPARACION_PLATO: 'Preparación de plato',
+  INFO_EDITADO: 'Ficha editada',
+  RECETA_CREADA: 'Receta creada',
+  RECETA_EDITADA: 'Receta editada',
+  RECETA_ELIMINADA: 'Receta eliminada'
+};
+
+// Borrador de corrección de un movimiento (cantidad + detalles opcionales)
+export interface MovementCorrectionDraft {
+  cantidad: number;
+  motivo?: MotivoComiso;
+  fechaVencimiento?: string;
+  notas?: string;
+}
+
 export const MOTIVO_STYLES: Record<MotivoComiso, { icon: string; desc: string; color: string }> = {
   'Vencimiento': { icon: '📅', desc: 'Producto vencido o caducado', color: 'border-red-500/40 bg-red-500/10 text-red-300' },
   'Daño físico': { icon: '💔', desc: 'Roto, golpeado o derramado', color: 'border-amber-500/40 bg-amber-500/10 text-amber-300' },

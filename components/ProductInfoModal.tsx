@@ -63,7 +63,7 @@ export const ProductInfoModal: React.FC<ProductInfoModalProps> = ({
   if (!isOpen || !product || !draft) return null;
 
   const activeFoto = isEditing ? draft.foto : product.foto;
-  const hasPhoto = !!activeFoto && failedFoto !== activeFoto;
+  const hasPhoto = !!activeFoto && !/images\.unsplash\.com/i.test(activeFoto) && failedFoto !== activeFoto;
 
   const expStatus = checkExpiration(product.fechaVencimiento);
   const isOutOfStock = product.stockActual <= 0;

@@ -10,6 +10,13 @@ const STORAGE_KEY_PRODUCTS = 'sahoco_live_products_v9';
 const STORAGE_KEY_HISTORY = 'sahoco_live_history_v9';
 const STORAGE_KEY_USER = 'sahoco_live_user_v9';
 
+// Limpia fotos de ejemplo guardadas en versiones anteriores (Unsplash).
+// Si la foto guardada es un placeholder viejo, se trata como "sin foto".
+function cleanStoredPhoto(url: unknown): string {
+  const s = String(url || '');
+  return /images\.unsplash\.com/i.test(s) ? '' : s;
+}
+
 // --- SESSION STORAGE ---
 export function getCurrentUser(): UserName | null {
   if (typeof window === 'undefined') return null;
@@ -59,7 +66,7 @@ export function getLocalProducts(): ProductItem[] {
             id = `PRD-R${item.rowIndex || idx + 1}`;
           }
           seen.add(id);
-          return { ...item, id };
+          return { ...item, id, foto: cleanStoredPhoto(item.foto) };
         });
       }
     }
@@ -85,7 +92,12 @@ export function getLocalHistory(): HistoryRecord[] {
     const raw = localStorage.getItem(STORAGE_KEY_HISTORY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) {
+        return parsed.map((item: HistoryRecord) => ({
+          ...item,
+          itemFoto: cleanStoredPhoto(item.itemFoto)
+        }));
+      }
     }
   } catch (e) {
     console.error('Error reading cached history', e);

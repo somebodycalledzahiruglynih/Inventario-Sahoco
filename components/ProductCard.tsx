@@ -42,7 +42,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const [failedFoto, setFailedFoto] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const hasPhoto = !!product.foto && failedFoto !== product.foto;
+  const hasPhoto = !!product.foto && !/images\.unsplash\.com/i.test(product.foto) && failedFoto !== product.foto;
 
   const expStatus = checkExpiration(product.fechaVencimiento);
 

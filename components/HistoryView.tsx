@@ -7,10 +7,10 @@ import { ProductThumb } from './ProductThumb';
 
 interface HistoryViewProps {
   history: HistoryRecord[];
-  onOpenComiso?: (record: HistoryRecord) => void;
+  onOpenRecord?: (record: HistoryRecord) => void;
 }
 
-export const HistoryView: React.FC<HistoryViewProps> = ({ history, onOpenComiso }) => {
+export const HistoryView: React.FC<HistoryViewProps> = ({ history, onOpenRecord }) => {
   const formatTimeAgo = (timestamp: string) => {
     try {
       const diffMs = Date.now() - new Date(timestamp).getTime();
@@ -95,23 +95,23 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onOpenComiso 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {history.map((record) => {
             const style = getRecordStyle(record);
-            const isComiso = record.tipo === 'COMISO' && !!onOpenComiso;
+            const isInteractive = !!onOpenRecord;
 
             return (
               <div
                 key={record.id}
-                role={isComiso ? 'button' : undefined}
-                tabIndex={isComiso ? 0 : undefined}
-                onClick={isComiso ? () => onOpenComiso(record) : undefined}
-                onKeyDown={isComiso ? (e) => {
+                role={isInteractive ? 'button' : undefined}
+                tabIndex={isInteractive ? 0 : undefined}
+                onClick={isInteractive ? () => onOpenRecord(record) : undefined}
+                onKeyDown={isInteractive ? (e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    onOpenComiso(record);
+                    onOpenRecord(record);
                   }
                 } : undefined}
-                title={isComiso ? 'Toca para ver el detalle completo y editar' : undefined}
+                title={isInteractive ? 'Toca para ver el detalle completo' : undefined}
                 className={`bg-[#1a1a1a] border border-white/[0.08] rounded-2xl p-3.5 flex items-center gap-3 hover:bg-[#222222] hover:border-orange-500/25 transition-all shadow-[0_2px_12px_rgba(0,0,0,0.25)] ${
-                  isComiso ? 'cursor-pointer active:scale-[0.99] focus:outline-none focus:border-red-500/40' : ''
+                  isInteractive ? 'cursor-pointer active:scale-[0.99] focus:outline-none focus:border-orange-500/40' : ''
                 }`}
               >
                 {/* Product Photo Thumbnail */}
@@ -130,20 +130,20 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onOpenComiso 
                 {/* Details */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-bold text-xs sm:text-sm text-white truncate block">
+                    <span className="font-bold text-xs sm:text-sm text-white break-words block min-w-0">
                       {record.itemNombre}
                     </span>
                     <span className="flex items-center gap-0.5 flex-none">
                       <span className="text-[10px] text-slate-500 whitespace-nowrap">
                         {formatTimeAgo(record.timestamp)}
                       </span>
-                      {isComiso && (
+                      {isInteractive && (
                         <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
                       )}
                     </span>
                   </div>
 
-                  <p className="text-xs text-slate-300 mt-0.5 truncate">
+                  <p className="text-xs text-slate-300 mt-0.5 line-clamp-2 break-words">
                     {record.detalle}
                   </p>
 

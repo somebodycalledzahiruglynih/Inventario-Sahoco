@@ -18,7 +18,10 @@ export const ProductThumb: React.FC<ProductThumbProps> = ({
 }) => {
   const [failedFor, setFailedFor] = useState<string | null>(null);
 
-  if (foto && failedFor !== foto) {
+  // Los placeholders viejos de Unsplash guardados en caché se ignoran
+  const usable = !!foto && !/images\.unsplash\.com/i.test(foto);
+
+  if (usable && failedFor !== foto) {
     return (
       <img
         src={foto}
