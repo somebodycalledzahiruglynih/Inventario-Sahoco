@@ -1,0 +1,99 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+  }
+
+  .dark {
+  --background: 0 0% 7%; /* not used */
+}
+
+/* Dark mode card, modal, form background */
+.dark .glass-panel,
+.dark .glass-panel-light,
+.dark .glass-card,
+.dark .card,
+.dark .modal,
+.dark .form {
+  background-color: #1C1613 !important; /* dark brown */
+  border: 1px solid #3A2D26 !important; /* soft border */
+}
+
+/* Primary text (titles) */
+.dark .text-primary {
+  color: #ffffff !important;
+}
+
+/* Accent buttons */
+.dark .btn-accent {
+  background-color: #D97706 !important;
+  color: #fff !important;
+}
+
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+  }
+
+  * {
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  body {
+    background-color: #0D0B0A; /* Very dark background */
+    color: #E5D9CC; /* Beige text for secondary */
+  }
+    font-feature-settings: "rlig" 1, "calt" 1;
+    overflow-x: hidden;
+  }
+}
+
+/* Glassmorphism utility classes */
+.glass-panel {
+  background: rgba(18, 20, 29, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-panel-light {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.glass-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(160, 160, 160, 0.2);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(160, 160, 160, 0.4);
+}
+
+/* Pulse Glow Animation */
+@keyframes softPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.02); }
+}
+
+.animate-soft-pulse {
+  animation: softPulse 3s ease-in-out infinite;
+}

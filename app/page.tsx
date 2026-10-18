@@ -1,0 +1,526 @@
+'use client';
+
+import React, { useState, useEffect, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Search, Filter, AlertTriangle, Plus, BarChart3, Package, ShoppingCart, Clock } from 'lucide-react';
+import confetti from 'canvas-confetti';
+
+import { ProductItem, HistoryRecord, UserName, MainCategory } from '../lib/types';
+import { 
+  getCurrentUser, 
+  setCurrentUser, 
+  getLocalProducts, 
+  saveLocalProducts, 
+  getLocalHistory, 
+  saveLocalHistory,
+  fetchRemoteProducts, 
+  sendStockUpdate, 
+  sendNewProduct,
+  sendDeleteProduct
+} from '../lib/apiClient';
+
+import { LoginScreen } from '../components/LoginScreen';
+import { TopHeader } from '../components/TopHeader';
+import { BottomNav, ActiveTab } from '../components/BottomNav';
+import { ProductCard } from '../components/ProductCard';
+import { ShoppingListView } from '../components/ShoppingListView';
+import { HistoryView } from '../components/HistoryView';
+import { AddProductModal } from '../components/AddProductModal';
+import { DeleteConfirmModal } from '../components/DeleteConfirmModal';
+import { AnalyticsDashboard } from '../components/AnalyticsDashboard';
+
+const CATEGORIES: { id: MainCategory | 'Todos'; label: string; icon: string }[] = [
+  { id: 'Todos', label: 'Todos', icon: '✨' },
+  { id: 'Insumos & Salado', label: 'Salado', icon: '🍟' },
+  { id: 'Postres & Repostería', label: 'Postres & Repostería', icon: '🍰' },
+  { id: 'Bebidas', label: 'Bebidas', icon: '🥤' },
+  { id: 'Desechables', label: 'Desechables & Empaques', icon: '📦' },
+];
+
+export default function MobileSahocoApp() {
+  const [currentUser, setUser] = useState<UserName | null>(null);
+  const [isInitializing, setIsInitializing] = useState(true);
+
+  // Data states
+  const [products, setProducts] = useState<ProductItem[]>([]);
+  const [history, setHistory] = useState<HistoryRecord[]>([]);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+
+  // Navigation & Filter states
+  const [currentTab, setCurrentTab] = useState<ActiveTab>('inventory');
+  const [activeCategory, setActiveCategory] = useState<MainCategory | 'Todos'>('Todos');
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // Modals
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<ProductItem | null>(null);
+
+  // 1. Check Login Session on mount
+  useEffect(() => {
+    const savedUser = getCurrentUser();
+    setUser(savedUser);
+    
+    // Load cached products & history (zero fake data)
+    setProducts(getLocalProducts());
+    setHistory(getLocalHistory());
+    setIsInitializing(false);
+
+    // Initial background sync
+    if (savedUser) {
+      handleSync();
+    }
+  }, []);
+
+  const handleLoginSuccess = (user: UserName) => {
+    setUser(user);
+    setCurrentUser(user);
+    handleSync();
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    setCurrentUser(null);
+  };
+
+  // Sync with Google Apps Script
+  const handleSync = async () => {
+    setIsSyncing(true);
+    setSyncError(null);
+    try {
+      const remote = await fetchRemoteProducts();
+      if (remote && remote.length > 0) {
+        setProducts(remote);
+        setSyncError(null);
+      } else {
+        setProducts([]);
+      }
+    } catch (e: any) {
+      console.warn('Sync notice:', e);
+      setSyncError(e.message || 'Error al conectar con Google Sheets');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // Add History Record helper
+  const addHistoryEntry = (
+    item: ProductItem,
+    tipo: HistoryRecord['tipo'],
+    detalle: string,
+    cantidadAnterior?: number,
+    cantidadNueva?: number
+  ) => {
+    const newEntry: HistoryRecord = {
+      id: `HIST-${Date.now().toString().slice(-4)}`,
+      timestamp: new Date().toISOString(),
+      usuario: currentUser || 'SAHOCO',
+      itemId: item.id,
+      itemNombre: item.nombre,
+      itemFoto: item.foto,
+      tipo,
+      detalle,
+      cantidadAnterior,
+      cantidadNueva
+    };
+
+    const updated = [newEntry, ...history];
+    setHistory(updated);
+    saveLocalHistory(updated);
+  };
+
+  // Stock Delta Adjustment [ - ] and [ + ] (Operational consumption / addition)
+  const handleUpdateStockDelta = async (product: ProductItem, delta: number) => {
+    const prevStock = product.stockActual;
+    const newStock = Math.max(0, Number((product.stockActual + delta).toFixed(2)));
+    if (newStock === prevStock) return;
+
+    // Optimistic UI update
+    const updated = products.map(p => p.id === product.id ? { ...p, stockActual: newStock } : p);
+    setProducts(updated);
+    saveLocalProducts(updated);
+
+    // Audit log
+    addHistoryEntry(
+      product,
+      delta > 0 ? 'INCREMENTO' : 'DECREMENTO',
+      delta > 0 
+        ? `Sumó existencias de ${prevStock} a ${newStock} ${product.unidad}`
+        : `Consumo/Descuento de ${prevStock} a ${newStock} ${product.unidad}`,
+      prevStock,
+      newStock
+    );
+
+    // Send POST to Google Apps Script with user identity
+    try {
+      await sendStockUpdate(product, newStock, product.cantidadSugerida, currentUser || 'SAHOCO');
+    } catch (err) {
+      console.warn('Stock update notice:', err);
+    }
+  };
+
+  // Update Cantidad Sugerida
+  const handleUpdateSugerido = async (product: ProductItem, newSugerido: number) => {
+    const updated = products.map(p => p.id === product.id ? { ...p, cantidadSugerida: newSugerido } : p);
+    setProducts(updated);
+    saveLocalProducts(updated);
+
+    addHistoryEntry(
+      product,
+      'SUGERIDO_EDITADO',
+      `Ajustó cantidad sugerida de compra a ${newSugerido} ${product.unidad}`
+    );
+
+    try {
+      await sendStockUpdate(product, product.stockActual, newSugerido, currentUser || 'SAHOCO');
+    } catch (err) {
+      console.warn('Sugerido update notice:', err);
+    }
+  };
+
+  // Update Photo
+  const handleUpdatePhoto = (product: ProductItem, newPhotoBase64: string) => {
+    const updated = products.map(p => p.id === product.id ? { ...p, foto: newPhotoBase64 } : p);
+    setProducts(updated);
+    saveLocalProducts(updated);
+
+    addHistoryEntry(
+      product,
+      'SUGERIDO_EDITADO',
+      `Actualizó fotografía del insumo`
+    );
+  };
+
+  // Restock from Shopping List
+  const handleRestockItem = (product: ProductItem, addedAmount: number) => {
+    const prevStock = product.stockActual;
+    const newStock = prevStock + addedAmount;
+    
+    const updated = products.map(p => p.id === product.id ? { ...p, stockActual: newStock } : p);
+    setProducts(updated);
+    saveLocalProducts(updated);
+
+    addHistoryEntry(
+      product,
+      'COMPRA_RECIBIDA',
+      `Reabasteció pedido (+${addedAmount} ${product.unidad}). Nuevo stock: ${newStock}`,
+      prevStock,
+      newStock
+    );
+
+    confetti({
+      particleCount: 40,
+      spread: 60,
+      origin: { y: 0.8 },
+      colors: ['#D97706', '#5C3D2E', '#F59E0B', '#10b981']
+    });
+
+    sendStockUpdate(product, newStock, product.cantidadSugerida, currentUser || 'SAHOCO');
+  };
+
+  // Add New Product
+  const handleAddNewProduct = async (productData: Omit<ProductItem, 'id' | 'rowIndex'>) => {
+    const newProduct: ProductItem = {
+      ...productData,
+      id: `PRD-${Date.now().toString().slice(-4)}`,
+      rowIndex: products.length + 2,
+      ultimaModificacion: new Date().toISOString(),
+      modificadoPor: currentUser || 'SAHOCO'
+    };
+
+    const updated = [newProduct, ...products];
+    setProducts(updated);
+    saveLocalProducts(updated);
+
+    addHistoryEntry(
+      newProduct,
+      'NUEVO_PRODUCTO',
+      `Registró nuevo insumo "${newProduct.nombre}" con stock inicial ${newProduct.stockActual} ${newProduct.unidad}`
+    );
+
+    try {
+      await sendNewProduct(newProduct, currentUser || 'SAHOCO');
+    } catch (e) {
+      console.warn('Add notice:', e);
+    }
+  };
+
+  // Permanent Delete Product Confirmation
+  const handleConfirmDeleteProduct = async (product: ProductItem) => {
+    const updated = products.filter(p => p.id !== product.id);
+    setProducts(updated);
+    saveLocalProducts(updated);
+
+    addHistoryEntry(
+      product,
+      'ELIMINACION_PRODUCTO',
+      `Eliminó permanentemente el insumo "${product.nombre}"`
+    );
+
+    try {
+      await sendDeleteProduct(product, currentUser || 'SAHOCO');
+    } catch (e) {
+      console.warn('Delete notice:', e);
+    }
+  };
+
+  // Filtered products for Inventory View
+  const filteredProducts = useMemo(() => {
+    return products.filter(p => {
+      const matchSearch = searchQuery.trim() === '' ||
+                          p.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          p.suplidor.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          p.id.toLowerCase().includes(searchQuery.toLowerCase());
+      if (!matchSearch) return false;
+      if (activeCategory === 'Todos') return true;
+
+      const catLower = (p.categoria || '').toLowerCase();
+      if (activeCategory === 'Insumos & Salado') {
+        return catLower.includes('salado') || catLower.includes('insumo') || catLower.includes('cocina');
+      }
+      if (activeCategory === 'Postres & Repostería') {
+        return catLower.includes('postre') || catLower.includes('reposter') || catLower.includes('synthia');
+      }
+      if (activeCategory === 'Bebidas') {
+        return catLower.includes('bebida') || catLower.includes('jugo') || catLower.includes('refresco') || catLower.includes('syrup') || catLower.includes('topping');
+      }
+      if (activeCategory === 'Desechables') {
+        return catLower.includes('desechable') || catLower.includes('empaque') || catLower.includes('envase');
+      }
+      return p.categoria === activeCategory;
+    });
+  }, [products, searchQuery, activeCategory]);
+
+  // Shopping Alert Count (items <= stockMinimo)
+  const shoppingAlertCount = useMemo(() => {
+    return products.filter(p => p.stockActual <= p.stockMinimo).length;
+  }, [products]);
+
+  // If loading or not logged in, show Login Screen
+  if (isInitializing) {
+    return <div className="min-h-screen bg-[#0f0f0f]" />;
+  }
+
+  if (!currentUser) {
+    return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  return (
+    <div className="min-h-screen bg-[#0f0f0f] text-slate-100 flex flex-col pb-safe-bottom">
+      
+      {/* 1. Top Header with User Badge */}
+      <TopHeader
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        isSyncing={isSyncing}
+        onRefresh={handleSync}
+        activeCount={products.length}
+      />
+
+      {/* 2. Main Content Container */}
+      <main className="flex-1 max-w-xl mx-auto w-full px-4 pt-3 sm:pt-5 space-y-4">
+        
+        {/* TAB 1: DASHBOARD & ANALÍTICA */}
+        {currentTab === 'analytics' && (
+          <AnalyticsDashboard
+            products={products}
+            history={history}
+            onNavigateToShopping={() => setCurrentTab('shopping')}
+          />
+        )}
+
+        {/* TAB 2: INSUMOS & CONTROL OPERATIVO */}
+        {currentTab === 'inventory' && (
+          <div className="space-y-4">
+            
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Buscar entre los productos por nombre o proveedor..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 bg-[#1a1a1a] border border-white/[0.08] rounded-2xl text-xs sm:text-sm font-medium text-white placeholder-slate-600 focus:outline-none focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/15"
+              />
+            </div>
+
+            {/* Quick Category Chips */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+              {CATEGORIES.map(cat => {
+                const isSelected = activeCategory === cat.id;
+                const count = cat.id === 'Todos'
+                  ? products.length
+                  : products.filter(p => {
+                      const catLower = (p.categoria || '').toLowerCase();
+                      if (cat.id === 'Insumos & Salado') return catLower.includes('salado') || catLower.includes('insumo') || catLower.includes('cocina');
+                      if (cat.id === 'Postres & Repostería') return catLower.includes('postre') || catLower.includes('reposter') || catLower.includes('synthia');
+                      if (cat.id === 'Bebidas') return catLower.includes('bebida') || catLower.includes('jugo') || catLower.includes('refresco') || catLower.includes('syrup') || catLower.includes('topping');
+                      if (cat.id === 'Desechables') return catLower.includes('desechable') || catLower.includes('empaque') || catLower.includes('envase');
+                      return p.categoria === cat.id;
+                    }).length;
+
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => setActiveCategory(cat.id)}
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all ${
+                      isSelected
+                        ? 'bg-orange-500 text-white shadow-[0_0_12px_rgba(249,115,22,0.35)]'
+                        : 'bg-[#1a1a1a] border border-white/[0.08] text-slate-400 hover:bg-[#242424] hover:border-orange-500/20'
+                    }`}
+                  >
+                    <span>{cat.icon}</span>
+                    <span>{cat.label}</span>
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${isSelected ? 'bg-white/20 text-white' : 'bg-[#242424] text-slate-500'}`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Summary Bar */}
+            <div className="flex items-center justify-between px-1 text-xs text-slate-400 font-medium">
+              <span>Mostrando {filteredProducts.length} de {products.length} productos</span>
+              {isSyncing && (
+                <span className="text-orange-400 flex items-center gap-1.5 text-[11px] font-semibold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-ping inline-block" />
+                  Sincronizando con Google Sheets...
+                </span>
+              )}
+            </div>
+
+            {/* Error Banner when products already exist */}
+            {syncError && products.length > 0 && (
+              <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-300 text-xs flex items-center justify-between gap-2">
+                <span className="truncate">⚠️ {syncError}</span>
+                <button
+                  onClick={handleSync}
+                  disabled={isSyncing}
+                  className="px-2.5 py-1 bg-red-500/20 hover:bg-red-500/30 rounded-lg text-white font-bold flex-none text-[11px]"
+                >
+                  Reintentar
+                </button>
+              </div>
+            )}
+
+            {/* 1. STATE: LOADING INITIAL PRODUCTS */}
+            {isSyncing && products.length === 0 && (
+              <div className="bg-[#1a1a1a] border border-white/[0.08] rounded-3xl p-10 text-center space-y-4 shadow-[0_4px_24px_rgba(0,0,0,0.5)]">
+                <div className="w-12 h-12 rounded-2xl bg-orange-500/10 border border-orange-500/25 text-orange-400 flex items-center justify-center mx-auto animate-spin">
+                  <Search className="w-6 h-6" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-base font-bold text-white">
+                    Conectando en tiempo real con Google Sheets...
+                  </h3>
+                  <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                    Cargando los 131 productos del inventario operativo ('Inv.').
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* 2. STATE: ERROR CONNECTING (ZERO FAKE DATA) */}
+            {!isSyncing && syncError && products.length === 0 && (
+              <div className="bg-[#1a1a1a] border border-red-500/30 rounded-3xl p-7 text-center space-y-4 shadow-[0_4px_24px_rgba(0,0,0,0.5)]">
+                <div className="w-13 h-13 rounded-2xl bg-red-500/15 border border-red-500/25 text-red-400 flex items-center justify-center mx-auto">
+                  <AlertTriangle className="w-7 h-7" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-base font-bold text-white">
+                    No se pudieron cargar los datos de Google Sheets
+                  </h3>
+                  <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+                    {syncError}
+                  </p>
+                  <div className="p-3 bg-[#141414] rounded-xl border border-white/[0.06] text-left text-[11px] text-slate-400 max-w-md mx-auto space-y-1">
+                    <p className="text-orange-400 font-bold">Instrucciones para activar la conexión en vivo:</p>
+                    <p>1. Abre tu Google Sheet con la pestaña <strong>Inv.</strong></p>
+                    <p>2. Ve a <strong>Extensiones &gt; Apps Script</strong> y pega el código de <code>google_apps_script/Código.gs</code>.</p>
+                    <p>3. En <strong>Implementar &gt; Gestionar implementaciones</strong>, crea una versión nueva con acceso para <strong>"Cualquiera"</strong>.</p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleSync}
+                  disabled={isSyncing}
+                  className="px-5 py-2.5 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow-[0_0_15px_rgba(249,115,22,0.35)] transition-all inline-flex items-center gap-2 cursor-pointer"
+                >
+                  <span>Reintentar Conexión</span>
+                </button>
+              </div>
+            )}
+
+            {/* 3. STATE: INSUMOS LIST (NO PAGINATION LIMIT) */}
+            {products.length > 0 && filteredProducts.length === 0 && (
+              <div className="bg-[#1a1a1a] border border-white/[0.08] rounded-3xl p-10 text-center text-slate-500 text-xs">
+                No se encontraron insumos con ese criterio de búsqueda.
+              </div>
+            )}
+
+            {products.length > 0 && filteredProducts.length > 0 && (
+              <div className="space-y-3">
+                {filteredProducts.map((product, idx) => (
+                  <ProductCard
+                    key={`${product.id}-${product.rowIndex || idx}`}
+                    product={product}
+                    onUpdateStockDelta={handleUpdateStockDelta}
+                    onUpdateSugerido={handleUpdateSugerido}
+                    onUpdatePhoto={handleUpdatePhoto}
+                    onRequestDelete={(p) => setItemToDelete(p)}
+                  />
+                ))}
+              </div>
+            )}
+
+          </div>
+        )}
+
+        {/* TAB 3: LISTA DE COMPRAS ESTÉTICA */}
+        {currentTab === 'shopping' && (
+          <ShoppingListView
+            products={products}
+            onRequestRestock={(product) => {
+              const qty = product.cantidadSugerida || Math.max(1, product.stockMaximo - product.stockActual);
+              handleRestockItem(product, qty);
+            }}
+            onUpdateSugerido={handleUpdateSugerido}
+          />
+        )}
+
+        {/* TAB 4: HISTORIAL Y AUDITORÍA DE MOVIMIENTOS */}
+        {currentTab === 'history' && (
+          <HistoryView
+            history={history}
+          />
+        )}
+
+      </main>
+
+      {/* 3. Bottom Navigation Bar */}
+      <BottomNav
+        currentTab={currentTab}
+        onSelectTab={(tab) => setCurrentTab(tab)}
+        onOpenAddModal={() => setIsAddModalOpen(true)}
+        shoppingAlertCount={shoppingAlertCount}
+      />
+
+      {/* 4. Add Product Modal */}
+      <AddProductModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onAddProduct={handleAddNewProduct}
+      />
+
+      {/* 5. Secure Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={!!itemToDelete}
+        item={itemToDelete}
+        onClose={() => setItemToDelete(null)}
+        onConfirmDelete={handleConfirmDeleteProduct}
+      />
+
+    </div>
+  );
+}
