@@ -1,4 +1,4 @@
-export const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwQ_EvGVC51xkcKVcC7iuEQARl71TRyNMYefZMVG4fBJmKD--1JJ2uYBFq5RamTzcyPxQ/exec';
+export const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyHBVhV5jS6mlyn5QnP-5_zvgCPwbLKEcvTnA0eBB0e95q_6jkDRwLY0pBbgQr1qZoBvQ/exec';
 
 export type MainCategory = 'Insumos & Salado' | 'Postres & Repostería' | 'Bebidas' | 'Desechables';
 

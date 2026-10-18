@@ -61,7 +61,7 @@ La app inicia con una pantalla de inicio de sesión estética con acceso restrin
 
 - **API Endpoint Oficial:**
   ```
-  https://script.google.com/macros/s/AKfycbwQ_EvGVC51xkcKVcC7iuEQARl71TRyNMYefZMVG4fBJmKD--1JJ2uYBFq5RamTzcyPxQ/exec
+  https://script.google.com/macros/s/AKfycbyHBVhV5jS6mlyn5QnP-5_zvgCPwbLKEcvTnA0eBB0e95q_6jkDRwLY0pBbgQr1qZoBvQ/exec
   ```
 - **Petición GET:** Carga el inventario inicial.
 - **Petición POST (Ajuste):**
