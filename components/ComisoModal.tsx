@@ -12,8 +12,9 @@ import {
   Calendar,
   ChevronRight
 } from 'lucide-react';
-import { ProductItem, MotivoComiso, MOTIVOS_COMISO, ComisoPayload } from '../lib/types';
+import { ProductItem, MotivoComiso, MOTIVOS_COMISO, MOTIVO_STYLES, ComisoPayload } from '../lib/types';
 import { checkExpiration } from '../lib/apiClient';
+import { ProductThumb } from './ProductThumb';
 
 interface ComisoModalProps {
   isOpen: boolean;
@@ -22,13 +23,6 @@ interface ComisoModalProps {
   onClose: () => void;
   onConfirm: (product: ProductItem, payload: ComisoPayload) => Promise<void> | void;
 }
-
-const MOTIVO_STYLES: Record<MotivoComiso, { icon: string; desc: string; color: string }> = {
-  'Vencimiento': { icon: '📅', desc: 'Producto vencido o caducado', color: 'border-red-500/40 bg-red-500/10 text-red-300' },
-  'Daño físico': { icon: '💔', desc: 'Roto, golpeado o derramado', color: 'border-amber-500/40 bg-amber-500/10 text-amber-300' },
-  'Error de preparación': { icon: '🍳', desc: 'Se quemó o quedó mal', color: 'border-orange-500/40 bg-orange-500/10 text-orange-300' },
-  'Otro': { icon: '📝', desc: 'Otra razón de pérdida', color: 'border-slate-500/40 bg-slate-500/10 text-slate-300' }
-};
 
 export const ComisoModal: React.FC<ComisoModalProps> = ({
   isOpen,
@@ -179,10 +173,10 @@ export const ComisoModal: React.FC<ComisoModalProps> = ({
                       }}
                       className="w-full p-3 rounded-2xl bg-[#1f1f1f] border border-white/[0.08] hover:border-red-500/30 hover:bg-[#242424] disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-3 text-left"
                     >
-                      <img
-                        src={p.foto}
-                        alt={p.nombre}
-                        className="w-11 h-11 rounded-xl object-cover bg-[#282828] border border-white/[0.08] flex-none"
+                      <ProductThumb
+                        foto={p.foto}
+                        nombre={p.nombre}
+                        className="w-11 h-11 rounded-xl bg-[#282828] border border-white/[0.08] flex-none"
                       />
                       <div className="flex-1 min-w-0">
                         <span className="font-bold text-xs sm:text-sm text-white truncate block">
@@ -207,10 +201,11 @@ export const ComisoModal: React.FC<ComisoModalProps> = ({
 
             {/* Product summary + change button */}
             <div className="p-3.5 rounded-2xl bg-[#1f1f1f] border border-white/[0.08] flex items-center gap-3">
-              <img
-                src={selectedProduct.foto}
-                alt={selectedProduct.nombre}
-                className="w-14 h-14 rounded-xl object-cover bg-[#282828] border border-white/[0.08] flex-none"
+              <ProductThumb
+                foto={selectedProduct.foto}
+                nombre={selectedProduct.nombre}
+                className="w-14 h-14 rounded-xl bg-[#282828] border border-white/[0.08] flex-none"
+                iconClassName="w-6 h-6"
               />
               <div className="flex-1 min-w-0">
                 <span className="font-bold text-sm text-white truncate block">

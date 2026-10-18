@@ -14,6 +14,7 @@ import {
   Flame
 } from 'lucide-react';
 import { ProductItem, MainCategory } from '../lib/types';
+import { ProductThumb } from './ProductThumb';
 
 interface ShoppingListViewProps {
   products: ProductItem[];
@@ -172,10 +173,10 @@ export const ShoppingListView: React.FC<ShoppingListViewProps> = ({
                   className="flex items-center justify-between gap-3 bg-[#141414]/80 border border-red-500/20 rounded-2xl px-3 py-2.5"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <img
-                      src={item.foto}
-                      alt={item.nombre}
-                      className="w-9 h-9 rounded-xl object-cover bg-[#242424] flex-none border border-red-500/25"
+                    <ProductThumb
+                      foto={item.foto}
+                      nombre={item.nombre}
+                      className="w-9 h-9 rounded-xl bg-[#242424] flex-none border border-red-500/25"
                     />
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
@@ -401,10 +402,10 @@ export const ShoppingListView: React.FC<ShoppingListViewProps> = ({
                           className="py-2.5 flex items-center justify-between gap-3"
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
-                            <img 
-                              src={item.foto} 
-                              alt={item.nombre} 
-                              className="w-10 h-10 rounded-xl object-cover bg-[#242424] flex-none border border-white/[0.08]" 
+                            <ProductThumb
+                              foto={item.foto}
+                              nombre={item.nombre}
+                              className="w-10 h-10 rounded-xl bg-[#242424] flex-none border border-white/[0.08]"
                             />
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5">

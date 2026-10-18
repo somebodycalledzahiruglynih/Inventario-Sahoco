@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { PackageCheck, Camera, X, Check, ArrowRight } from 'lucide-react';
 import { ProductItem, UnitType } from '../lib/types';
+import { ProductThumb } from './ProductThumb';
 import { fileToBase64 } from '../lib/apiClient';
 
 interface RestockModalProps {
@@ -107,7 +108,7 @@ export const RestockModal: React.FC<RestockModalProps> = ({
           {/* Product Summary Banner */}
           <div className="p-3.5 rounded-2xl bg-[#1f1f1f] border border-white/[0.08] flex items-center gap-3">
             <div className="w-16 h-16 rounded-xl overflow-hidden bg-[#282828] flex-none border border-white/[0.08] relative group">
-              <img src={foto || product.foto} alt={product.nombre} className="w-full h-full object-cover" />
+              <ProductThumb foto={foto || product.foto} nombre={product.nombre} className="w-full h-full" iconClassName="w-6 h-6" />
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}

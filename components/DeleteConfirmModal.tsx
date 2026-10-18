@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { ProductItem } from '../lib/types';
+import { ProductThumb } from './ProductThumb';
 
 interface DeleteConfirmModalProps {
   isOpen: boolean;
@@ -61,10 +62,11 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
 
         {/* Insumo Preview Card */}
         <div className="p-3.5 rounded-2xl bg-[#1f1f1f] border border-white/[0.08] flex items-center gap-3 mb-5">
-          <img
-            src={item.foto}
-            alt={item.nombre}
-            className="w-12 h-12 rounded-xl object-cover bg-[#282828] flex-none border border-white/[0.08]"
+          <ProductThumb
+            foto={item.foto}
+            nombre={item.nombre}
+            className="w-12 h-12 rounded-xl bg-[#282828] flex-none border border-white/[0.08]"
+            iconClassName="w-5 h-5"
           />
           <div className="min-w-0">
             <span className="font-bold text-xs sm:text-sm text-white truncate block">

@@ -46,6 +46,7 @@ export const ProductInfoModal: React.FC<ProductInfoModalProps> = ({
   const [draft, setDraft] = useState<ProductItem | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [failedFoto, setFailedFoto] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -60,6 +61,9 @@ export const ProductInfoModal: React.FC<ProductInfoModalProps> = ({
   }, [isOpen, product]);
 
   if (!isOpen || !product || !draft) return null;
+
+  const activeFoto = isEditing ? draft.foto : product.foto;
+  const hasPhoto = !!activeFoto && failedFoto !== activeFoto;
 
   const expStatus = checkExpiration(product.fechaVencimiento);
   const isOutOfStock = product.stockActual <= 0;
@@ -152,16 +156,31 @@ export const ProductInfoModal: React.FC<ProductInfoModalProps> = ({
           <div className="flex items-start gap-3.5">
             <div className="relative flex-none">
               <div className="w-24 h-24 rounded-2xl overflow-hidden bg-[#242424] border border-white/[0.08]">
-                <img
-                  src={isEditing ? draft.foto : product.foto}
-                  alt={product.nombre}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80';
-                  }}
-                />
+                {hasPhoto ? (
+                  <img
+                    src={activeFoto}
+                    alt={product.nombre}
+                    className="w-full h-full object-cover"
+                    onError={() => setFailedFoto(activeFoto)}
+                  />
+                ) : isEditing ? (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full h-full flex flex-col items-center justify-center gap-1 text-slate-500 hover:text-orange-400 hover:bg-orange-500/[0.06] transition-colors btn-thumb"
+                    title="Añadir foto del insumo"
+                  >
+                    <Camera className="w-5 h-5" />
+                    <span className="text-[9px] font-bold uppercase tracking-wider">Añadir foto</span>
+                  </button>
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-slate-600">
+                    <Package className="w-6 h-6" />
+                    <span className="text-[9px] font-bold uppercase tracking-wider">Sin foto</span>
+                  </div>
+                )}
               </div>
-              {isEditing && (
+              {isEditing && hasPhoto && (
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}

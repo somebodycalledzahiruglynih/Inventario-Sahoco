@@ -39,7 +39,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 }) => {
   const [sugeridoInput, setSugeridoInput] = useState<string>(product.cantidadSugerida?.toString() || '0');
   const [isEditingSugerido, setIsEditingSugerido] = useState(false);
+  const [failedFoto, setFailedFoto] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const hasPhoto = !!product.foto && failedFoto !== product.foto;
 
   const expStatus = checkExpiration(product.fechaVencimiento);
 
@@ -87,23 +90,35 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         {/* Product Photo */}
         <div className="relative flex-none">
           <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden bg-[#242424] border border-white/[0.08]">
-            <img
-              src={product.foto}
-              alt={product.nombre}
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80';
-              }}
-            />
+            {hasPhoto ? (
+              <img
+                src={product.foto}
+                alt={product.nombre}
+                className="w-full h-full object-cover"
+                onError={() => setFailedFoto(product.foto)}
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full h-full flex flex-col items-center justify-center gap-1 text-slate-500 hover:text-orange-400 hover:bg-orange-500/[0.06] transition-colors btn-thumb"
+                title="Añadir foto del insumo"
+              >
+                <Camera className="w-5 h-5 sm:w-6 sm:h-6" />
+                <span className="text-[9px] font-bold uppercase tracking-wider">Añadir foto</span>
+              </button>
+            )}
           </div>
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-[#1a1a1a] border border-orange-500/30 text-orange-400 shadow-md hover:bg-orange-500/15 active:scale-95 transition-all"
-            title="Tomar foto o subir imagen"
-          >
-            <Camera className="w-3.5 h-3.5" />
-          </button>
+          {hasPhoto && (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-[#1a1a1a] border border-orange-500/30 text-orange-400 shadow-md hover:bg-orange-500/15 active:scale-95 transition-all"
+              title="Tomar foto o subir imagen"
+            >
+              <Camera className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
         {/* Product Info */}

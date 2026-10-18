@@ -63,6 +63,13 @@ export const MOTIVOS_COMISO: MotivoComiso[] = [
   'Otro'
 ];
 
+export const MOTIVO_STYLES: Record<MotivoComiso, { icon: string; desc: string; color: string }> = {
+  'Vencimiento': { icon: '📅', desc: 'Producto vencido o caducado', color: 'border-red-500/40 bg-red-500/10 text-red-300' },
+  'Daño físico': { icon: '💔', desc: 'Roto, golpeado o derramado', color: 'border-amber-500/40 bg-amber-500/10 text-amber-300' },
+  'Error de preparación': { icon: '🍳', desc: 'Se quemó o quedó mal', color: 'border-orange-500/40 bg-orange-500/10 text-orange-300' },
+  'Otro': { icon: '📝', desc: 'Otra razón de pérdida', color: 'border-slate-500/40 bg-slate-500/10 text-slate-300' }
+};
+
 export interface ComisoPayload {
   cantidad: number;
   motivo: MotivoComiso;

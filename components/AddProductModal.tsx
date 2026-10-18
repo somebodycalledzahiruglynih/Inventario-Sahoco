@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { Camera, X, Check, PackagePlus } from 'lucide-react';
+import { Camera, X, Check, PackagePlus, Package } from 'lucide-react';
 import { ProductItem, UnitType, MainCategory } from '../lib/types';
 import { fileToBase64 } from '../lib/apiClient';
 
@@ -38,7 +38,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
   const [suplidor, setSuplidor] = useState('PriceSmart');
   const [categoria, setCategoria] = useState<MainCategory>('Insumos & Salado');
   const [descripcion, setDescripcion] = useState('');
-  const [foto, setFoto] = useState<string>('https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=400&q=80');
+  const [foto, setFoto] = useState<string>('');
   const [stockActual, setStockActual] = useState<number>(10);
   const [unidad, setUnidad] = useState<UnitType>('Libras');
   const [stockMinimo, setStockMinimo] = useState<number>(5);
@@ -118,11 +118,18 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
           {/* Photo Upload / Camera Viewfinder */}
           <div>
             <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-1.5">
-              Fotografía del Producto
+              Fotografía del Producto (opcional)
             </label>
             <div className="flex items-center gap-3">
               <div className="w-20 h-20 rounded-2xl overflow-hidden bg-[#1f1f1f] border border-white/[0.08] relative">
-                <img src={foto} alt="Vista previa" className="w-full h-full object-cover" />
+                {foto ? (
+                  <img src={foto} alt="Vista previa" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-slate-600">
+                    <Package className="w-6 h-6" />
+                    <span className="text-[9px] font-bold uppercase tracking-wider">Sin foto</span>
+                  </div>
+                )}
               </div>
               
               <div className="flex-1 space-y-1.5">

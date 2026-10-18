@@ -14,6 +14,7 @@ import {
   Circle
 } from 'lucide-react';
 import { ProductItem, Recipe } from '../lib/types';
+import { ProductThumb } from './ProductThumb';
 
 export interface DishDeduction {
   product: ProductItem;
@@ -207,10 +208,10 @@ export const PrepareDishModal: React.FC<PrepareDishModalProps> = ({
                       )}
                     </div>
 
-                    <img
-                      src={product?.foto || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=100&q=80'}
-                      alt={ing.nombre}
-                      className="w-11 h-11 rounded-xl object-cover bg-[#282828] border border-white/[0.08] flex-none"
+                    <ProductThumb
+                      foto={product?.foto}
+                      nombre={ing.nombre}
+                      className="w-11 h-11 rounded-xl bg-[#282828] border border-white/[0.08] flex-none"
                     />
 
                     <div className="flex-1 min-w-0">
@@ -255,10 +256,10 @@ export const PrepareDishModal: React.FC<PrepareDishModalProps> = ({
                       key={extra.productId}
                       className="p-2.5 rounded-2xl bg-[#1f1f1f] border border-sky-500/25 flex items-center gap-2.5"
                     >
-                      <img
-                        src={product.foto}
-                        alt={product.nombre}
-                        className="w-10 h-10 rounded-xl object-cover bg-[#282828] border border-white/[0.08] flex-none"
+                      <ProductThumb
+                        foto={product.foto}
+                        nombre={product.nombre}
+                        className="w-10 h-10 rounded-xl bg-[#282828] border border-white/[0.08] flex-none"
                       />
                       <div className="flex-1 min-w-0">
                         <span className="font-bold text-xs text-white truncate block">{product.nombre}</span>
@@ -326,10 +327,10 @@ export const PrepareDishModal: React.FC<PrepareDishModalProps> = ({
                   onClick={() => handleAddExtra(p)}
                   className="w-full p-2.5 rounded-2xl bg-[#1f1f1f] border border-white/[0.08] hover:border-sky-500/35 hover:bg-[#242424] transition-all flex items-center gap-2.5 text-left"
                 >
-                  <img
-                    src={p.foto}
-                    alt={p.nombre}
-                    className="w-9 h-9 rounded-lg object-cover bg-[#282828] border border-white/[0.08] flex-none"
+                  <ProductThumb
+                    foto={p.foto}
+                    nombre={p.nombre}
+                    className="w-9 h-9 rounded-lg bg-[#282828] border border-white/[0.08] flex-none"
                   />
                   <div className="flex-1 min-w-0">
                     <span className="font-bold text-xs text-white truncate block">{p.nombre}</span>

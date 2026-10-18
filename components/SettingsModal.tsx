@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Settings, Flame, Search, X, Info, Server, Timer, ShieldCheck } from 'lucide-react';
 import { ProductItem, UserName } from '../lib/types';
+import { ProductThumb } from './ProductThumb';
 import { getBatchWindowMs } from '../lib/pendingChanges';
 import { APPS_SCRIPT_ENDPOINT } from '../lib/appsScriptUrl';
 
@@ -149,10 +150,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           }`}
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
-                            <img
-                              src={product.foto}
-                              alt={product.nombre}
-                              className="w-9 h-9 rounded-xl object-cover bg-[#242424] flex-none border border-white/[0.08]"
+                            <ProductThumb
+                              foto={product.foto}
+                              nombre={product.nombre}
+                              className="w-9 h-9 rounded-xl bg-[#242424] flex-none border border-white/[0.08]"
                             />
                             <div className="min-w-0">
                               <p className="text-xs font-bold text-white truncate">{product.nombre}</p>

@@ -1,14 +1,16 @@
 'use client';
 
 import React from 'react';
-import { Clock, User, ArrowUpRight, ArrowDownRight, Edit3, Trash2, ShieldAlert, ChefHat, Pencil, NotebookPen } from 'lucide-react';
+import { Clock, User, ArrowUpRight, ArrowDownRight, Edit3, Trash2, ShieldAlert, ChefHat, Pencil, NotebookPen, ChevronRight } from 'lucide-react';
 import { HistoryRecord } from '../lib/types';
+import { ProductThumb } from './ProductThumb';
 
 interface HistoryViewProps {
   history: HistoryRecord[];
+  onOpenComiso?: (record: HistoryRecord) => void;
 }
 
-export const HistoryView: React.FC<HistoryViewProps> = ({ history }) => {
+export const HistoryView: React.FC<HistoryViewProps> = ({ history, onOpenComiso }) => {
   const formatTimeAgo = (timestamp: string) => {
     try {
       const diffMs = Date.now() - new Date(timestamp).getTime();
@@ -93,18 +95,32 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {history.map((record) => {
             const style = getRecordStyle(record);
+            const isComiso = record.tipo === 'COMISO' && !!onOpenComiso;
 
             return (
               <div
                 key={record.id}
-                className="bg-[#1a1a1a] border border-white/[0.08] rounded-2xl p-3.5 flex items-center gap-3 hover:bg-[#222222] hover:border-orange-500/25 transition-all shadow-[0_2px_12px_rgba(0,0,0,0.25)]"
+                role={isComiso ? 'button' : undefined}
+                tabIndex={isComiso ? 0 : undefined}
+                onClick={isComiso ? () => onOpenComiso(record) : undefined}
+                onKeyDown={isComiso ? (e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onOpenComiso(record);
+                  }
+                } : undefined}
+                title={isComiso ? 'Toca para ver el detalle completo y editar' : undefined}
+                className={`bg-[#1a1a1a] border border-white/[0.08] rounded-2xl p-3.5 flex items-center gap-3 hover:bg-[#222222] hover:border-orange-500/25 transition-all shadow-[0_2px_12px_rgba(0,0,0,0.25)] ${
+                  isComiso ? 'cursor-pointer active:scale-[0.99] focus:outline-none focus:border-red-500/40' : ''
+                }`}
               >
                 {/* Product Photo Thumbnail */}
                 <div className="relative flex-none">
-                  <img
-                    src={record.itemFoto || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=200&q=80'}
-                    alt={record.itemNombre}
-                    className="w-12 h-12 rounded-xl object-cover bg-[#242424] border border-white/[0.08]"
+                  <ProductThumb
+                    foto={record.itemFoto}
+                    nombre={record.itemNombre}
+                    className="w-12 h-12 rounded-xl bg-[#242424] border border-white/[0.08]"
+                    iconClassName="w-5 h-5"
                   />
                   <div className={`absolute -bottom-1 -right-1 p-0.5 rounded-full text-white text-[9px] shadow-sm ${style.badge}`}>
                     {style.icon}
@@ -117,8 +133,13 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history }) => {
                     <span className="font-bold text-xs sm:text-sm text-white truncate block">
                       {record.itemNombre}
                     </span>
-                    <span className="text-[10px] text-slate-500 whitespace-nowrap flex-none">
-                      {formatTimeAgo(record.timestamp)}
+                    <span className="flex items-center gap-0.5 flex-none">
+                      <span className="text-[10px] text-slate-500 whitespace-nowrap">
+                        {formatTimeAgo(record.timestamp)}
+                      </span>
+                      {isComiso && (
+                        <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
+                      )}
                     </span>
                   </div>
 

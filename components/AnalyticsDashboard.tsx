@@ -10,9 +10,11 @@ import {
   Layers, 
   ArrowRight,
   ShieldAlert,
-  ChefHat
+  ChefHat,
+  ChevronRight
 } from 'lucide-react';
 import { ProductItem, HistoryRecord, MainCategory } from '../lib/types';
+import { ProductThumb } from './ProductThumb';
 
 interface AnalyticsDashboardProps {
   products: ProductItem[];
@@ -20,6 +22,7 @@ interface AnalyticsDashboardProps {
   onNavigateToShopping: () => void;
   onRequestComiso: () => void;
   onNavigateToRecipes: () => void;
+  onOpenComiso?: (record: HistoryRecord) => void;
 }
 
 export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
@@ -27,7 +30,8 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
   history,
   onNavigateToShopping,
   onRequestComiso,
-  onNavigateToRecipes
+  onNavigateToRecipes,
+  onOpenComiso
 }) => {
   // Real dynamic KPI calculations from sheet data
   const totalInsumos = products.length;
@@ -288,10 +292,10 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                     <span className="w-5 text-center text-xs font-black text-orange-400 flex-none">
                       #{index + 1}
                     </span>
-                    <img 
-                      src={item.foto} 
-                      alt={item.nombre} 
-                      className="w-10 h-10 rounded-xl object-cover bg-[#242424] flex-none border border-white/[0.08]" 
+                    <ProductThumb
+                      foto={item.foto}
+                      nombre={item.nombre}
+                      className="w-10 h-10 rounded-xl bg-[#242424] flex-none border border-white/[0.08]"
                     />
                     <div className="min-w-0">
                       <span className="font-bold text-xs sm:text-sm text-white truncate block">
@@ -344,13 +348,31 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
           </div>
         ) : (
           <div className="divide-y divide-white/[0.06]">
-            {history.slice(0, 5).map(record => (
-              <div key={record.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
+            {history.slice(0, 5).map(record => {
+              const isComiso = record.tipo === 'COMISO' && !!onOpenComiso;
+              return (
+              <div
+                key={record.id}
+                role={isComiso ? 'button' : undefined}
+                tabIndex={isComiso ? 0 : undefined}
+                onClick={isComiso ? () => onOpenComiso(record) : undefined}
+                onKeyDown={isComiso ? (e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onOpenComiso(record);
+                  }
+                } : undefined}
+                title={isComiso ? 'Toca para ver el detalle completo y editar' : undefined}
+                className={`py-2.5 flex items-center justify-between gap-3 text-xs rounded-xl transition-colors ${
+                  isComiso ? 'cursor-pointer hover:bg-white/[0.04] focus:outline-none' : ''
+                }`}
+              >
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <img
-                    src={record.itemFoto || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=100&q=80'}
-                    alt={record.itemNombre}
-                    className="w-8 h-8 rounded-lg object-cover bg-[#242424] flex-none border border-white/[0.08]"
+                  <ProductThumb
+                    foto={record.itemFoto}
+                    nombre={record.itemNombre}
+                    className="w-8 h-8 rounded-lg bg-[#242424] flex-none border border-white/[0.08]"
+                    iconClassName="w-3.5 h-3.5"
                   />
                   <div className="min-w-0">
                     <span className="font-bold text-white block truncate">
@@ -362,16 +384,22 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                   </div>
                 </div>
 
-                <div className="text-right flex-none">
-                  <span className="font-bold text-orange-400 block text-[11px]">
-                    {record.usuario}
-                  </span>
-                  <span className="text-[10px] text-slate-500">
-                    {new Intl.DateTimeFormat('es-DO', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }).format(new Date(record.timestamp))}
-                  </span>
+                <div className="flex items-center gap-1.5 flex-none">
+                  <div className="text-right">
+                    <span className="font-bold text-orange-400 block text-[11px]">
+                      {record.usuario}
+                    </span>
+                    <span className="text-[10px] text-slate-500">
+                      {new Intl.DateTimeFormat('es-DO', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }).format(new Date(record.timestamp))}
+                    </span>
+                  </div>
+                  {isComiso && (
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
+                  )}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

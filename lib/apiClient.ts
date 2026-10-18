@@ -293,7 +293,7 @@ export async function fetchRemoteProducts(): Promise<RemoteProductsResult> {
             suplidor,
             categoria,
             descripcion: String(row.descripcion || ''),
-            foto: String(row.foto || row.imagen || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=400&q=80'),
+            foto: String(row.foto || row.imagen || ''),
             fechaVencimiento: String(row.fechaVencimiento || row.vencimiento || ''),
             stockActual,
             unidad: String(row.unidad || 'Unidad'),
