@@ -12,7 +12,8 @@ import {
   XCircle,
   Clock,
   Trash2,
-  Info,
+  Pencil,
+  ChevronRight,
   ShieldAlert
 } from 'lucide-react';
 import { ProductItem } from '../lib/types';
@@ -39,6 +40,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 }) => {
   const [sugeridoInput, setSugeridoInput] = useState<string>(product.cantidadSugerida?.toString() || '0');
   const [isEditingSugerido, setIsEditingSugerido] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [failedFoto, setFailedFoto] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -49,6 +51,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const isOutOfStock = product.stockActual <= 0;
   const isLowStock = !isOutOfStock && product.stockActual <= product.stockMinimo;
   const isHealthy = !isOutOfStock && !isLowStock;
+
+  const toggleExpanded = () => setIsExpanded(prev => !prev);
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -73,7 +77,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   };
 
   return (
-    <div className="dark-card rounded-3xl p-4 sm:p-5 dark-card-hover relative overflow-hidden transition-all">
+    <div className={`dark-card rounded-3xl p-4 sm:p-5 dark-card-hover relative overflow-hidden transition-all ${isExpanded ? 'ring-1 ring-orange-500/20' : ''}`}>
 
       {/* Hidden file input */}
       <input
@@ -85,7 +89,21 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         className="hidden"
       />
 
-      <div className="flex items-start gap-3.5 sm:gap-4">
+      {/* Clickable header: expands the stock controls */}
+      <div
+        role="button"
+        tabIndex={0}
+        aria-expanded={isExpanded}
+        onClick={toggleExpanded}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            toggleExpanded();
+          }
+        }}
+        title={isExpanded ? 'Ocultar controles' : 'Mostrar controles de stock'}
+        className="group flex items-start gap-3.5 sm:gap-4 cursor-pointer focus:outline-none touch-manipulation"
+      >
 
         {/* Product Photo */}
         <div className="relative flex-none">
@@ -100,7 +118,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             ) : (
               <button
                 type="button"
-                onClick={() => fileInputRef.current?.click()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  fileInputRef.current?.click();
+                }}
                 className="w-full h-full flex flex-col items-center justify-center gap-1 text-slate-500 hover:text-orange-400 hover:bg-orange-500/[0.06] transition-colors btn-thumb"
                 title="Añadir foto del insumo"
               >
@@ -112,7 +133,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           {hasPhoto && (
             <button
               type="button"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={(e) => {
+                e.stopPropagation();
+                fileInputRef.current?.click();
+              }}
               className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-[#1a1a1a] border border-orange-500/30 text-orange-400 shadow-md hover:bg-orange-500/15 active:scale-95 transition-all"
               title="Tomar foto o subir imagen"
             >
@@ -124,9 +148,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         {/* Product Info */}
         <div className="flex-1 min-w-0">
 
-          {/* Status Badges + Delete */}
-          <div className="flex items-center justify-between gap-1 mb-1">
-            <div className="flex items-center flex-wrap gap-1.5">
+          {/* Status Badges + Supplier + Expand indicator */}
+          <div className="flex items-start justify-between gap-2 mb-1">
+            <div className="flex items-center flex-wrap gap-1.5 min-w-0">
               {isOutOfStock && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-red-500/15 text-red-400 border border-red-500/25">
                   <XCircle className="w-3 h-3" /> Agotado
@@ -148,25 +172,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               </span>
             </div>
 
-            <div className="flex items-center gap-0.5 flex-none">
-              <button
-                type="button"
-                onClick={() => onRequestInfo(product)}
-                className="p-1.5 rounded-xl text-slate-500 hover:text-sky-400 hover:bg-sky-500/10 transition-colors"
-                title="Ver información completa del insumo"
-              >
-                <Info className="w-4 h-4" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onRequestDelete(product)}
-                className="p-1.5 -mr-1 rounded-xl text-slate-600 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                title="Eliminar insumo"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
+            <ChevronRight
+              className={`w-4 h-4 mt-0.5 flex-none text-slate-500 group-hover:text-orange-400 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}
+              aria-hidden="true"
+            />
           </div>
 
           {/* Product Name */}
@@ -202,82 +211,107 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         </div>
       </div>
 
-      {/* Stock & Controls */}
-      <div className="mt-4 pt-3 border-t border-white/[0.06] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      {/* Expanded panel: stock controls + actions */}
+      {isExpanded && (
+        <div className="animate-in fade-in slide-in-from-top-1 duration-200">
 
-        {/* Stock Display + Sugerido */}
-        <div className="flex items-center justify-between sm:justify-start gap-4">
-          <div>
-            <span className="text-[10px] uppercase font-bold text-slate-500 block tracking-wider">
-              Stock Actual
-            </span>
-            <div className="flex items-baseline gap-1">
-              <span className={`text-2xl font-black font-display ${isOutOfStock ? 'text-red-400' : isLowStock ? 'text-amber-400' : 'text-white'}`}>
-                {product.stockActual}
-              </span>
-              <span className="text-xs font-semibold text-slate-400">
-                {product.unidad}
-              </span>
+          {/* Stock & Controls */}
+          <div className="mt-4 pt-3 border-t border-white/[0.06] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+
+            {/* Stock Display + Sugerido */}
+            <div className="flex items-center justify-between sm:justify-start gap-4">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-500 block tracking-wider">
+                  Stock Actual
+                </span>
+                <div className="flex items-baseline gap-1">
+                  <span className={`text-2xl font-black font-display ${isOutOfStock ? 'text-red-400' : isLowStock ? 'text-amber-400' : 'text-white'}`}>
+                    {product.stockActual}
+                  </span>
+                  <span className="text-xs font-semibold text-slate-400">
+                    {product.unidad}
+                  </span>
+                </div>
+              </div>
+
+              {/* Editable Sugerido */}
+              <div className="bg-[#242424] p-1.5 px-2.5 rounded-2xl border border-orange-500/20">
+                <span className="text-[9px] uppercase font-extrabold text-orange-400 block tracking-wider">
+                  Sugerido Compra
+                </span>
+                <div className="flex items-center gap-1 mt-0.5">
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={sugeridoInput}
+                    onChange={(e) => setSugeridoInput(e.target.value)}
+                    onBlur={handleBlurSugerido}
+                    className="w-14 px-1.5 py-0.5 rounded-lg bg-[#1a1a1a] border border-white/[0.08] text-xs font-bold text-white text-center focus:outline-none focus:border-orange-500/50"
+                  />
+                  <span className="text-[10px] text-slate-500 font-semibold">{product.unidad}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* [ - ] and [ + ] buttons */}
+            <div className="flex items-center gap-2 self-end sm:self-center">
+              <button
+                type="button"
+                onClick={() => onUpdateStockDelta(product, -1)}
+                disabled={product.stockActual <= 0}
+                className="w-12 h-12 rounded-2xl bg-[#242424] hover:bg-red-500/15 text-red-400 border border-white/[0.08] hover:border-red-500/30 disabled:opacity-30 active:scale-95 transition-all flex items-center justify-center btn-thumb"
+                title="Descontar 1 unidad"
+              >
+                <Minus className="w-5 h-5 stroke-[2.5]" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onUpdateStockDelta(product, 1)}
+                className="w-12 h-12 rounded-2xl bg-orange-500 hover:bg-orange-400 text-white shadow-[0_0_16px_rgba(249,115,22,0.3)] active:scale-95 transition-all flex items-center justify-center btn-thumb"
+                title="Sumar 1 unidad"
+              >
+                <Plus className="w-5 h-5 stroke-[2.5]" />
+              </button>
             </div>
           </div>
 
-          {/* Editable Sugerido */}
-          <div className="bg-[#242424] p-1.5 px-2.5 rounded-2xl border border-orange-500/20">
-            <span className="text-[9px] uppercase font-extrabold text-orange-400 block tracking-wider">
-              Sugerido Compra
-            </span>
-            <div className="flex items-center gap-1 mt-0.5">
-              <input
-                type="number"
-                min="0"
-                step="any"
-                value={sugeridoInput}
-                onChange={(e) => setSugeridoInput(e.target.value)}
-                onBlur={handleBlurSugerido}
-                className="w-14 px-1.5 py-0.5 rounded-lg bg-[#1a1a1a] border border-white/[0.08] text-xs font-bold text-white text-center focus:outline-none focus:border-orange-500/50"
-              />
-              <span className="text-[10px] text-slate-500 font-semibold">{product.unidad}</span>
-            </div>
+          {/* Secondary actions */}
+          <div className="mt-3 flex items-stretch gap-2">
+            <button
+              type="button"
+              onClick={() => onRequestComiso(product)}
+              disabled={product.stockActual <= 0}
+              className="flex-1 py-2.5 px-3 rounded-2xl bg-red-500/10 hover:bg-red-500/15 disabled:opacity-35 disabled:cursor-not-allowed text-red-400 border border-red-500/25 hover:border-red-500/45 text-xs font-bold active:scale-[0.99] transition-all btn-thumb flex items-center justify-center gap-2"
+              title="Registrar pérdida, vencimiento o daño de este insumo"
+            >
+              <ShieldAlert className="w-4 h-4 flex-none" />
+              <span>Comiso / Merma</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onRequestInfo(product)}
+              className="flex-1 py-2.5 px-3 rounded-2xl bg-[#242424] hover:bg-[#2c2c2c] text-slate-300 border border-white/[0.08] hover:border-orange-500/25 text-xs font-bold active:scale-[0.99] transition-all btn-thumb flex items-center justify-center gap-2"
+              title="Ver ficha completa y editar información"
+            >
+              <Pencil className="w-4 h-4 flex-none" />
+              <span>Editar</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onRequestDelete(product)}
+              aria-label="Eliminar insumo"
+              title="Eliminar insumo"
+              className="px-3 rounded-2xl bg-[#242424] hover:bg-red-500/10 text-slate-500 hover:text-red-400 border border-white/[0.08] hover:border-red-500/30 active:scale-[0.99] transition-all btn-thumb flex items-center justify-center"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
           </div>
         </div>
-
-        {/* [ - ] and [ + ] buttons */}
-        <div className="flex items-center gap-2 self-end sm:self-center">
-          <button
-            type="button"
-            onClick={() => onUpdateStockDelta(product, -1)}
-            disabled={product.stockActual <= 0}
-            className="w-12 h-12 rounded-2xl bg-[#242424] hover:bg-red-500/15 text-red-400 border border-white/[0.08] hover:border-red-500/30 disabled:opacity-30 active:scale-95 transition-all flex items-center justify-center btn-thumb"
-            title="Descontar 1 unidad"
-          >
-            <Minus className="w-5 h-5 stroke-[2.5]" />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onUpdateStockDelta(product, 1)}
-            className="w-12 h-12 rounded-2xl bg-orange-500 hover:bg-orange-400 text-white shadow-[0_0_16px_rgba(249,115,22,0.3)] active:scale-95 transition-all flex items-center justify-center btn-thumb"
-            title="Sumar 1 unidad"
-          >
-            <Plus className="w-5 h-5 stroke-[2.5]" />
-          </button>
-        </div>
-      </div>
-
-      {/* Comiso / Merma action */}
-      <button
-        type="button"
-        onClick={() => onRequestComiso(product)}
-        disabled={product.stockActual <= 0}
-        className="mt-3 w-full py-3 px-4 rounded-2xl bg-red-500/10 hover:bg-red-500/15 disabled:opacity-35 disabled:cursor-not-allowed text-red-400 border border-red-500/25 hover:border-red-500/45 text-xs font-bold active:scale-[0.99] transition-all btn-thumb flex items-center justify-center gap-2"
-        title="Registrar pérdida, vencimiento o daño de este insumo"
-      >
-        <ShieldAlert className="w-4 h-4 flex-none" />
-        <span>Comiso / Merma</span>
-        <span className="text-[10px] font-semibold text-red-400/70 hidden sm:inline">
-          Pérdida o vencimiento
-        </span>
-      </button>
+      )}
     </div>
   );
 };

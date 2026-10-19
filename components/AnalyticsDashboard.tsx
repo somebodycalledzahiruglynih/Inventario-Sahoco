@@ -82,7 +82,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
     <div className="space-y-4 sm:space-y-5">
 
       {/* 0. Quick Actions: Comiso / Merma & Recetas */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3">
         <button
           onClick={onRequestComiso}
           className="bg-red-500/10 border border-red-500/25 hover:bg-red-500/15 hover:border-red-500/40 rounded-3xl p-4 flex items-center gap-3 text-left transition-all active:scale-[0.99] btn-thumb"
@@ -117,7 +117,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
       </div>
 
       {/* 1. Real KPI Cards Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
         
         {/* KPI 1: Total Insumos */}
         <div className="bg-[#1a1a1a] border border-white/[0.08] shadow-[0_4px_20px_rgba(0,0,0,0.3)] rounded-3xl p-4 sm:p-5 flex flex-col justify-between">
@@ -217,7 +217,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
       </div>
 
       {/* 2. Key Indicators: Categories Distribution & Top 5 Lowest Stock */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4">
         
         {/* Card A: Gráfica de Stock por Categoría */}
         <div className="bg-[#1a1a1a] border border-white/[0.08] shadow-[0_4px_20px_rgba(0,0,0,0.3)] rounded-3xl p-4 sm:p-5 space-y-4">

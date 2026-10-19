@@ -8,10 +8,11 @@ import {
   Building2, 
   CheckCircle2, 
   FileText,
-  PackagePlus,
   Search,
   Sparkles,
-  Flame
+  Flame,
+  ChevronRight,
+  X
 } from 'lucide-react';
 import { ProductItem, MainCategory } from '../lib/types';
 import { ProductThumb } from './ProductThumb';
@@ -153,7 +154,7 @@ export const ShoppingListView: React.FC<ShoppingListViewProps> = ({
             </div>
             <div className="flex-1">
               <h2 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
-                <span>🔥 Insumos Críticos de Prioridad Alta</span>
+                <span>Insumos Críticos de Prioridad Alta</span>
                 <span className="px-2 py-0.5 rounded-full text-xs font-black bg-red-500/20 text-red-400 border border-red-500/30">
                   {priorityCriticalItems.length}
                 </span>
@@ -181,40 +182,26 @@ export const ShoppingListView: React.FC<ShoppingListViewProps> = ({
                     }
                   }}
                   title="Toca para ver la información y reponer"
-                  className="flex items-center justify-between gap-3 bg-[#141414]/80 border border-red-500/20 rounded-2xl px-3 py-2.5 cursor-pointer hover:bg-[#1a1a1a] hover:border-red-500/40 active:scale-[0.99] transition-all focus:outline-none focus:border-red-500/50"
+                  className="group flex items-center justify-between gap-3 bg-[#141414]/80 border border-red-500/20 rounded-2xl px-3 py-2.5 cursor-pointer hover:bg-[#1a1a1a] hover:border-red-500/40 active:scale-[0.99] transition-all focus:outline-none focus:border-red-500/50 touch-manipulation"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <ProductThumb
                       foto={item.foto}
                       nombre={item.nombre}
-                      className="w-9 h-9 rounded-xl bg-[#242424] flex-none border border-red-500/25"
+                      className="w-10 h-10 rounded-xl bg-[#242424] flex-none border border-red-500/25"
                     />
                     <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-xs text-white break-words block">
-                          {item.nombre}
-                        </span>
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-red-500/20 text-red-400 border border-red-500/30 flex-none">
-                          🔥 ALTA
-                        </span>
-                      </div>
-                      <p className="text-[10px] text-slate-400 mt-0.5">
+                      <span className="font-bold text-xs text-white break-words block">
+                        {item.nombre}
+                      </span>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
                         Stock: <strong className={isOutOfStock ? 'text-red-400' : 'text-white'}>{item.stockActual}</strong> {item.unidad} • Mín: {item.stockMinimo}
                         {isOutOfStock && <span className="ml-1.5 text-red-400 font-extrabold">• AGOTADO</span>}
                       </p>
                     </div>
                   </div>
 
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openRestock();
-                    }}
-                    className="flex items-center gap-1.5 py-1.5 px-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold shadow-[0_0_12px_rgba(16,185,129,0.3)] active:scale-95 transition-all flex-none"
-                  >
-                    <PackagePlus className="w-3.5 h-3.5" />
-                    <span className="whitespace-nowrap">Reponer</span>
-                  </button>
+                  <ChevronRight className="w-4 h-4 text-red-400/60 group-hover:text-red-400 transition-colors flex-none" aria-hidden="true" />
                 </div>
               );
             })}
@@ -307,9 +294,10 @@ export const ShoppingListView: React.FC<ShoppingListViewProps> = ({
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs px-1"
+              aria-label="Limpiar búsqueda"
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white px-1"
             >
-              ✕
+              <X className="w-3.5 h-3.5" aria-hidden="true" />
             </button>
           )}
         </div>
@@ -372,7 +360,7 @@ export const ShoppingListView: React.FC<ShoppingListViewProps> = ({
         </div>
       ) : (
         /* 6. Supplier Groups Grid */
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           {suppliers.map(supplier => {
             const items = grouped[supplier] || [];
             const isCopied = copiedSupplier === supplier;
@@ -423,7 +411,7 @@ export const ShoppingListView: React.FC<ShoppingListViewProps> = ({
                             }
                           }}
                           title="Toca para ver la información y reponer"
-                          className="py-2.5 flex items-center justify-between gap-3 -mx-2 px-2 rounded-xl cursor-pointer hover:bg-white/[0.04] active:scale-[0.99] transition-all focus:outline-none focus:bg-white/[0.04]"
+                          className="group py-2.5 flex items-center justify-between gap-3 -mx-2 px-2 rounded-xl cursor-pointer hover:bg-white/[0.04] active:scale-[0.99] transition-all focus:outline-none focus:bg-white/[0.04] touch-manipulation"
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
                             <ProductThumb
@@ -447,7 +435,7 @@ export const ShoppingListView: React.FC<ShoppingListViewProps> = ({
                                 )}
                                 {item.esPrioritario && (
                                   <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-orange-500/15 text-orange-400 border border-orange-500/25 flex-none">
-                                    🔥 Clave
+                                    Clave
                                   </span>
                                 )}
                               </div>
@@ -455,27 +443,14 @@ export const ShoppingListView: React.FC<ShoppingListViewProps> = ({
                                 <span>
                                   Stock: <strong className="text-white">{item.stockActual}</strong> {item.unidad} • Mín: {item.stockMinimo}
                                 </span>
-                                <span className="px-1.5 py-0.2 rounded text-[10px] bg-white/[0.05] text-slate-400 border border-white/[0.05]">
+                                <span className="px-1.5 py-0.5 rounded text-[10px] bg-white/[0.05] text-slate-400 border border-white/[0.05]">
                                   {item.categoria}
                                 </span>
                               </div>
                             </div>
                           </div>
 
-                          {/* Action Button: Reponer Stock / Registrar Entrada */}
-                          <div className="flex items-center gap-2 flex-none">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onOpenRestock(item);
-                              }}
-                              className="flex items-center gap-1.5 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-[0_0_12px_rgba(16,185,129,0.3)] active:scale-95 transition-all"
-                              title="Registrar entrada de insumo"
-                            >
-                              <PackagePlus className="w-3.5 h-3.5" />
-                              <span className="whitespace-nowrap">Reponer</span>
-                            </button>
-                          </div>
+                          <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-orange-400 group-hover:translate-x-0.5 transition-all flex-none" aria-hidden="true" />
                         </div>
                       );
                     })}

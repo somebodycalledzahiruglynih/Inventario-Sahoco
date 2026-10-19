@@ -92,7 +92,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onOpenRecord 
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3">
           {history.map((record) => {
             const style = getRecordStyle(record);
             const isInteractive = !!onOpenRecord;

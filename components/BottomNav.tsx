@@ -30,7 +30,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[#141414]/95 backdrop-blur-xl border-t border-white/[0.07] shadow-[0_-4px_24px_rgba(0,0,0,0.5)] safe-area-pb">
-      <div className="max-w-lg mx-auto px-2 py-1.5 flex items-center justify-between">
+      <div className="max-w-xl mx-auto px-2 py-1.5 flex items-center justify-between">
 
         {/* Analítica */}
         <button onClick={() => onSelectTab('analytics')} className={tabClass('analytics')}>

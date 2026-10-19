@@ -31,7 +31,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f0f0f] flex flex-col justify-center items-center px-4 py-8 sm:px-6 relative overflow-hidden">
+    <div className="min-h-screen bg-[#0f0f0f] flex flex-col justify-center items-center px-4 pt-8 pb-20 sm:px-6 sm:pb-28 relative overflow-hidden">
 
       {/* Ambient glow */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[300px] rounded-full bg-orange-500/5 blur-3xl pointer-events-none" />
@@ -43,18 +43,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         className="w-full max-w-md bg-[#1a1a1a] rounded-3xl p-6 sm:p-8 border border-white/[0.07] shadow-[0_24px_60px_rgba(0,0,0,0.6)] relative z-10"
       >
         {/* Brand Header */}
-        <div className="text-center mb-6">
-          <div className="flex justify-center mb-4">
+        <div className="text-center mb-8">
+          <div className="flex justify-center">
             <img
               src="/Logo.png"
               alt="SAHOCO"
               className="h-16 sm:h-20 w-auto max-w-[240px] object-contain block drop-shadow-md select-none"
             />
           </div>
-          <h1 className="font-display font-extrabold text-2xl sm:text-3xl tracking-wide text-white">
-            SAHOCO
-          </h1>
-          <p className="text-xs text-slate-400 font-medium mt-1">
+          <p className="text-xs text-slate-400 font-medium mt-3">
             Control de Insumos & Inventario Operativo
           </p>
         </div>

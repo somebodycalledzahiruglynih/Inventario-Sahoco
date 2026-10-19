@@ -180,7 +180,7 @@ export const RecipesView: React.FC<RecipesViewProps> = ({
           No se encontraron recetas con ese criterio.
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3">
           {filteredRecipes.map(recipe => {
             const status = getStockStatus(recipe);
             const isConfirmingDelete = confirmingDeleteId === recipe.id;
